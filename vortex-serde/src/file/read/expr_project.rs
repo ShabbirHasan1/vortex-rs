@@ -51,7 +51,11 @@ pub fn expr_project(
         })
     } else if let Some(n) = expr.as_any().downcast_ref::<Not>() {
         let own_refs = n.references();
-        if own_refs.iter().all(|p| projection.contains(p)) {
+        if own_refs
+            .iter()
+            // FIXME(DK): what does projetion mean if there is an identity?
+            .all(|p| p.map(|p| projection.contains(p)).unwrap_or(true))
+        {
             expr_project(n.child(), projection).map(|proj| Arc::new(Not::new(proj)) as _)
         } else {
             None
@@ -67,13 +71,14 @@ pub fn expr_project(
                     .rhs()
                     .references()
                     .intersection(&bexp.lhs().references())
-                    .any(|f| projection.contains(f)))
+                    // FIXME(DK): what does projetion mean if there is an identity?
+                    .any(|f| f.map(|f| projection.contains(f)).unwrap_or(true)))
                 .then_some(lhsp),
                 (None, Some(rhsp)) => (!bexp
                     .lhs()
                     .references()
                     .intersection(&bexp.rhs().references())
-                    .any(|f| projection.contains(f)))
+                    .any(|f| f.map(|f| projection.contains(f)).unwrap_or(true)))
                 .then_some(rhsp),
                 (None, None) => None,
             }

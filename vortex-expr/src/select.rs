@@ -70,11 +70,11 @@ impl VortexExpr for Select {
         })
     }
 
-    fn collect_references<'a>(&'a self, references: &mut HashSet<&'a Field>) {
+    fn collect_references<'a>(&'a self, references: &mut HashSet<Option<&'a Field>>) {
         match self {
-            Select::Include(f) => references.extend(f.iter()),
+            Select::Include(f) => references.extend(f.iter().map(Some)),
             // It's weird that we treat the references of exclusions and inclusions the same, we need to have a wrapper around Field in the return
-            Select::Exclude(e) => references.extend(e.iter()),
+            Select::Exclude(e) => references.extend(e.iter().map(Some)),
         }
     }
 }

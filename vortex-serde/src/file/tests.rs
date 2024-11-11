@@ -405,6 +405,75 @@ async fn filter_string() {
 
 #[tokio::test]
 #[cfg_attr(miri, ignore)]
+async fn filter_string_chunked() {
+    let name_chunk1 = Array::from(vec![Some("Joseph"), Some("James"), Some("Khalil")]);
+    let age_chunk1 = Array::from(vec![Some(25), Some(31), None]);
+    let name_chunk2 = Array::from(vec![
+        Some("Pharrell"),
+        Some("Angela"),
+        Some("Mikhail"),
+        None,
+    ]);
+    let age_chunk2 = Array::from(vec![Some(57), Some(18), None, Some(32)]);
+
+    let chunk1 = StructArray::from_fields(&[("name", name_chunk1), ("age", age_chunk1)])
+        .unwrap()
+        .into_array();
+    let chunk2 = StructArray::from_fields(&[("name", name_chunk2), ("age", age_chunk2)])
+        .unwrap()
+        .into_array();
+    let dtype = chunk1.dtype().clone();
+
+    let array = ChunkedArray::try_new(vec![chunk1, chunk2], dtype)
+        .unwrap()
+        .into_array();
+
+    let written_bytes = LayoutWriter::new(Vec::new())
+        .write_array_columns(array)
+        .await
+        .unwrap()
+        .finalize()
+        .await
+        .unwrap();
+    let actual_array = LayoutBatchStreamBuilder::new(written_bytes, LayoutDeserializer::default())
+        .with_row_filter(RowFilter::new(Arc::new(BinaryExpr::new(
+            Arc::new(Column::new(Field::from("name"))),
+            Operator::Eq,
+            Arc::new(Literal::new("Joseph".into())),
+        ))))
+        .build()
+        .await
+        .unwrap()
+        .read_all()
+        .await
+        .unwrap();
+
+    assert_eq!(actual_array.len(), 1);
+    let names = actual_array
+        .with_dyn(|a| a.as_struct_array_unchecked().field(0))
+        .unwrap();
+    assert_eq!(
+        names
+            .into_varbinview()
+            .unwrap()
+            .with_iterator(|iter| iter
+                .flatten()
+                .map(|s| unsafe { String::from_utf8_unchecked(s.to_vec()) })
+                .collect::<Vec<_>>())
+            .unwrap(),
+        vec!["Joseph".to_string()]
+    );
+    let ages = actual_array
+        .with_dyn(|a| a.as_struct_array_unchecked().field(1))
+        .unwrap();
+    assert_eq!(
+        ages.into_primitive().unwrap().maybe_null_slice::<i32>(),
+        vec![25]
+    );
+}
+
+#[tokio::test]
+#[cfg_attr(miri, ignore)]
 async fn filter_or() {
     let names = VarBinArray::from_iter(
         vec![Some("Joseph"), None, Some("Angela"), Some("Mikhail"), None],

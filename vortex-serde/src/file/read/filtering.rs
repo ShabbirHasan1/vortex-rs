@@ -18,7 +18,7 @@ use crate::file::read::expr_project::expr_project;
 
 #[derive(Debug, Clone)]
 pub struct RowFilter {
-    conjunction: Vec<Arc<dyn VortexExpr>>,
+    pub conjunction: Vec<Arc<dyn VortexExpr>>,
 }
 
 impl RowFilter {
@@ -77,7 +77,7 @@ impl VortexExpr for RowFilter {
         null_as_false(mask.into_bool()?)
     }
 
-    fn collect_references<'a>(&'a self, references: &mut HashSet<&'a Field>) {
+    fn collect_references<'a>(&'a self, references: &mut HashSet<Option<&'a Field>>) {
         for expr in self.conjunction.iter() {
             expr.collect_references(references);
         }

@@ -33,10 +33,10 @@ pub trait VortexExpr: Debug + Send + Sync + PartialEq<dyn Any> + Display {
     fn evaluate(&self, batch: &Array) -> VortexResult<Array>;
 
     /// Accumulate all field references from this expression and its children in the provided set
-    fn collect_references<'a>(&'a self, _references: &mut HashSet<&'a Field>) {}
+    fn collect_references<'a>(&'a self, _references: &mut HashSet<Option<&'a Field>>) {}
 
     /// Accumulate all field references from this expression and its children in a new set
-    fn references(&self) -> HashSet<&Field> {
+    fn references(&self) -> HashSet<Option<&Field>> {
         let mut refs = HashSet::new();
         self.collect_references(&mut refs);
         refs

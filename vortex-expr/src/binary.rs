@@ -62,7 +62,7 @@ impl VortexExpr for BinaryExpr {
         }
     }
 
-    fn collect_references<'a>(&'a self, references: &mut HashSet<&'a Field>) {
+    fn collect_references<'a>(&'a self, references: &mut HashSet<Option<&'a Field>>) {
         self.lhs.collect_references(references);
         self.rhs.collect_references(references);
     }

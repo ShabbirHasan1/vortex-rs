@@ -45,7 +45,7 @@ impl VortexExpr for Not {
         })
     }
 
-    fn collect_references<'a>(&'a self, references: &mut HashSet<&'a Field>) {
+    fn collect_references<'a>(&'a self, references: &mut HashSet<Option<&'a Field>>) {
         self.child.collect_references(references)
     }
 }

@@ -42,11 +42,26 @@ impl_from_primitive_for_array!(f16);
 impl_from_primitive_for_array!(f32);
 impl_from_primitive_for_array!(f64);
 
-impl From<Vec<Option<BufferString>>> for Array {
-    fn from(value: Vec<Option<BufferString>>) -> Self {
-        VarBinViewArray::from_iter(value, DType::Utf8(Nullability::Nullable)).into_array()
-    }
+macro_rules! impl_from_string_like {
+    ($T:ty) => {
+        impl From<Vec<$T>> for Array {
+            fn from(value: Vec<$T>) -> Self {
+                VarBinViewArray::from_iter_bin(value).into_array()
+            }
+        }
+
+        impl From<Vec<Option<$T>>> for Array {
+            fn from(value: Vec<Option<$T>>) -> Self {
+                VarBinViewArray::from_iter(value, DType::Utf8(Nullability::Nullable)).into_array()
+            }
+        }
+    };
 }
+
+impl_from_string_like!(&str);
+impl_from_string_like!(&[u8]);
+impl_from_string_like!(String);
+impl_from_string_like!(BufferString);
 
 impl From<Vec<Option<Buffer>>> for Array {
     fn from(value: Vec<Option<Buffer>>) -> Self {

@@ -78,20 +78,24 @@ impl ChunkedLayout {
         }
     }
 
-    fn metadata_layout(&self) -> VortexResult<Box<dyn LayoutReader>> {
-        let metadata_fb = self
-            .flatbuffer()
-            .children()
-            .unwrap_or_default()
-            .iter()
-            .next()
-            .vortex_expect("must have metadata");
-        self.layout_builder.read_layout(
-            self.fb_bytes.clone(),
-            metadata_fb._tab.loc(),
-            Scan::new(None),
-            self.message_cache.unknown_dtype(0xFFFF_u16), // FIXME(DK): metadata needs an id
-        )
+    fn metadata_layout(&self) -> VortexResult<Option<Box<dyn LayoutReader>>> {
+        self.has_metadata()
+            .then(|| {
+                let metadata_fb = self
+                    .flatbuffer()
+                    .children()
+                    .unwrap_or_default()
+                    .iter()
+                    .next()
+                    .vortex_expect("must have metadata");
+                self.layout_builder.read_layout(
+                    self.fb_bytes.clone(),
+                    metadata_fb._tab.loc(),
+                    Scan::new(None),
+                    self.message_cache.unknown_dtype(0xFFFF_u16), // FIXME(DK): metadata needs an id
+                )
+            })
+            .transpose()
     }
 
     fn has_metadata(&self) -> bool {
@@ -152,8 +156,12 @@ impl LayoutReader for ChunkedLayout {
         if let Some(br) = &mut self.chunk_reader {
             br.read_next(selector)
         } else {
+            let metadata_reader = match self.metadata_layout()? {
+                Some(metadata_layout) => MetadataReader::NotYetRead(metadata_layout),
+                None => MetadataReader::NoMetadata,
+            };
             self.chunk_reader = Some(BufferedLayoutReader::new(
-                MetadataReader::NotYetRead(self.metadata_layout()?),
+                metadata_reader,
                 self.child_layouts(|i| {
                     self.message_cache
                         .relative(i, self.message_cache.dtype().clone())

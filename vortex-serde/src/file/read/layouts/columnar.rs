@@ -228,7 +228,11 @@ impl ColumnarLayout {
                     Select::Exclude(_) => vortex_panic!("Select::Exclude is not supported"),
                 }
             } else {
-                e.references().into_iter().cloned().collect::<Vec<_>>()
+                e.references()
+                    .into_iter()
+                    .map(|x| x.unwrap())
+                    .cloned()
+                    .collect::<Vec<_>>()
             }
         })
     }

@@ -2,8 +2,10 @@ use std::collections::VecDeque;
 use std::mem;
 
 use vortex_array::array::ChunkedArray;
+use vortex_array::compute::unary::scalar_at;
 use vortex_array::{Array, ArrayDType, IntoArray};
 use vortex_error::{vortex_bail, VortexResult};
+use vortex_scalar::BoolScalar;
 
 use super::Scan;
 use crate::file::pruning::PruningPredicate;
@@ -17,14 +19,16 @@ pub type RangedLayoutReader = ((usize, usize), Box<dyn LayoutReader>);
 #[derive(Debug)]
 pub struct BufferedLayoutReader {
     metadata_reader: Option<MetadataReader>,
-    layouts: VecDeque<RangedLayoutReader>,
+    layouts: VecDeque<(usize, RangedLayoutReader)>,
     arrays: Vec<Array>,
     n_chunks: usize,
     scan: Scan,
+    chunk_mask: Option<Array>,
 }
 
 #[derive(Debug)]
 pub enum MetadataReader {
+    NoMetadata,
     NotYetRead(Box<dyn LayoutReader>),
     Read(Array),
 }
@@ -38,81 +42,137 @@ impl BufferedLayoutReader {
         let n_chunks = layouts.len();
         Self {
             metadata_reader: Some(metadata_reader),
-            layouts,
+            layouts: layouts.into_iter().enumerate().collect::<VecDeque<_>>(),
             arrays: Vec::new(),
             n_chunks,
             scan,
+            chunk_mask: None,
         }
     }
 
     // TODO(robert): Support out of order reads
     fn buffer_read(&mut self, mask: &RowMask) -> VortexResult<Option<Vec<Message>>> {
-        let metadata = match mem::take(&mut self.metadata_reader) {
-            // FIXME(DK): pull this out
-            Some(MetadataReader::NotYetRead(mut reader)) => {
-                match reader.read_selection(&RowMask::new_valid_between(0, self.n_chunks))? {
-                    Some(BatchRead::ReadMore(messages)) => return Ok(Some(messages)),
-                    Some(BatchRead::Batch(array)) => {
-                        self.metadata_reader = Some(MetadataReader::Read(array.clone()));
-                        array
-                    }
-                    None => vortex_bail!("unexpected end of stream while reading metadata array"),
+        if self.chunk_mask.is_none() {
+            println!("BufferedLayoutReader: No chunk_mask");
+            let metadata = match mem::take(&mut self.metadata_reader) {
+                // FIXME(DK): pull this out
+                metadata_reader @ Some(MetadataReader::NoMetadata) => {
+                    self.metadata_reader = metadata_reader;
+                    None
                 }
-            }
-            Some(MetadataReader::Read(array)) => {
-                self.metadata_reader = Some(MetadataReader::Read(array.clone()));
-                array
-            }
-            None => vortex_bail!("Called buffer_read while buffer_read was running"),
-        };
+                Some(MetadataReader::NotYetRead(mut reader)) => {
+                    match reader.read_selection(&RowMask::new_valid_between(0, self.n_chunks))? {
+                        Some(BatchRead::ReadMore(messages)) => {
+                            println!("BufferedLayoutReader: No chunk_mask: need to read more");
+                            self.metadata_reader = Some(MetadataReader::NotYetRead(reader));
+                            return Ok(Some(messages));
+                        }
+                        Some(BatchRead::Batch(array)) => {
+                            println!("BufferedLayoutReader: No chunk_mask: read an array");
+                            self.metadata_reader = Some(MetadataReader::Read(array.clone()));
+                            Some(array)
+                        }
+                        None => {
+                            vortex_bail!("unexpected end of stream while reading metadata array")
+                        }
+                    }
+                }
+                Some(MetadataReader::Read(array)) => {
+                    println!("BufferedLayoutReader: No chunk_mask: already read an array");
+                    self.metadata_reader = Some(MetadataReader::Read(array.clone()));
+                    Some(array)
+                }
+                None => vortex_bail!("Called buffer_read while buffer_read was running"),
+            };
 
-        let pruner = self
-            .scan
-            .expr
-            .as_ref()
-            .map(PruningPredicate::try_new)
-            .flatten()
-            .map(|pruner| pruner.expr().evaluate(&metadata))
-            .transpose()?;
+            println!(
+                "BufferedLayoutReader: No chunk_mask: scan.expr={:?}, metadata={:?}",
+                self.scan.expr, metadata
+            );
+            self.chunk_mask = self
+                .scan
+                .expr
+                .as_ref()
+                .zip(metadata)
+                .and_then(|(expression, metadata)| {
+                    println!("PruningPreciate: original_expr:{:?}", expression);
+                    let predicate = PruningPredicate::try_new(expression)?;
+                    println!(
+                        "PruningPreciate: predicate={:?} original_expr:{:?}",
+                        predicate, expression
+                    );
+                    Some((predicate, metadata))
+                })
+                .map(|(predicate, metadata)| predicate.expr().evaluate(&metadata))
+                .transpose()?
+        }
+        println!("BufferedLayoutReader: chunk_mask={:?}", self.chunk_mask);
 
         // FIXME(DK): convert the pruner array to a boolean, get an iterator and zip it with the
         // children to determine if we should keep that split
         //
         // Maybe we actually stash the mask in MetadataReader? The index of interest is self.arrays.len().
 
-        while let Some(((begin, end), layout)) = self.layouts.pop_front() {
+        while let Some((index, ((begin, end), layout))) = self.layouts.pop_front() {
             if mask.begin() <= begin && begin < mask.end()
                 || mask.begin() < end && end <= mask.end()
             {
-                self.layouts.push_front(((begin, end), layout));
+                self.layouts.push_front((index, ((begin, end), layout)));
                 break;
             }
         }
 
-        while let Some(((begin, end), mut layout)) = self.layouts.pop_front() {
+        while let Some((index, ((begin, end), mut layout))) = self.layouts.pop_front() {
             // This selection doesn't know about rows in this chunk, we should put it back and wait for another request with different range
             if mask.end() <= begin || mask.begin() > end {
-                self.layouts.push_front(((begin, end), layout));
+                self.layouts.push_front((index, ((begin, end), layout)));
                 return Ok(None);
             }
+
+            let chunk_is_pruned = self
+                .chunk_mask
+                .as_ref()
+                .map(|chunk_mask| -> VortexResult<_> {
+                    Ok(BoolScalar::try_from(&scalar_at(chunk_mask, index)?)?
+                        .value()
+                        .map(|x| {
+                            // assert!(!x);
+                            x
+                        })
+                        // FIXME(DK): what does a null in the array mean
+                        .unwrap_or(false))
+                })
+                .transpose()?
+                .unwrap_or(false);
+
+            println!(
+                "BufferedLayoutReader: chunk_is_pruned={}, index={}",
+                chunk_is_pruned, index,
+            );
+
+            if chunk_is_pruned {
+                // do not push the layout back as it is pruned.
+                return Ok(None);
+            }
+
             let layout_selection = mask.slice(begin, end).shift(begin)?;
             if let Some(rr) = layout.read_selection(&layout_selection)? {
                 match rr {
                     BatchRead::ReadMore(m) => {
-                        self.layouts.push_front(((begin, end), layout));
+                        self.layouts.push_front((index, ((begin, end), layout)));
                         return Ok(Some(m));
                     }
                     BatchRead::Batch(a) => {
                         self.arrays.push(a);
                         if end > mask.end() {
-                            self.layouts.push_front(((begin, end), layout));
+                            self.layouts.push_front((index, ((begin, end), layout)));
                             return Ok(None);
                         }
                     }
                 }
             } else {
                 if end > mask.end() && begin < mask.end() {
-                    self.layouts.push_front(((begin, end), layout));
+                    self.layouts.push_front((index, ((begin, end), layout)));
                     return Ok(None);
                 }
                 continue;
