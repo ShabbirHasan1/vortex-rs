@@ -2,16 +2,17 @@ use std::collections::{BTreeSet, VecDeque};
 
 use bytes::Bytes;
 use itertools::Itertools;
-use vortex_error::VortexResult;
+use vortex_error::{VortexExpect as _, VortexResult};
 use vortex_flatbuffers::footer;
 
-use crate::file::read::buffered::{BufferedLayoutReader, RangedLayoutReader};
+use crate::file::read::buffered::{BufferedLayoutReader, MetadataReader, RangedLayoutReader};
 use crate::file::read::cache::RelativeLayoutCache;
 use crate::file::read::mask::RowMask;
 use crate::file::{
     BatchRead, LayoutDeserializer, LayoutId, LayoutPartId, LayoutReader, LayoutSpec, Scan,
     CHUNKED_LAYOUT_ID,
 };
+
 #[derive(Default, Debug)]
 pub struct ChunkedLayoutSpec;
 
@@ -77,6 +78,22 @@ impl ChunkedLayout {
         }
     }
 
+    fn metadata_layout(&self) -> VortexResult<Box<dyn LayoutReader>> {
+        let metadata_fb = self
+            .flatbuffer()
+            .children()
+            .unwrap_or_default()
+            .iter()
+            .next()
+            .vortex_expect("must have metadata");
+        self.layout_builder.read_layout(
+            self.fb_bytes.clone(),
+            metadata_fb._tab.loc(),
+            Scan::new(None),
+            self.message_cache.unknown_dtype(0xFFFF_u16), // FIXME(DK): metadata needs an id
+        )
+    }
+
     fn has_metadata(&self) -> bool {
         self.flatbuffer()
             .metadata()
@@ -135,10 +152,14 @@ impl LayoutReader for ChunkedLayout {
         if let Some(br) = &mut self.chunk_reader {
             br.read_next(selector)
         } else {
-            self.chunk_reader = Some(BufferedLayoutReader::new(self.child_layouts(|i| {
-                self.message_cache
-                    .relative(i, self.message_cache.dtype().clone())
-            })?));
+            self.chunk_reader = Some(BufferedLayoutReader::new(
+                MetadataReader::NotYetRead(self.metadata_layout()?),
+                self.child_layouts(|i| {
+                    self.message_cache
+                        .relative(i, self.message_cache.dtype().clone())
+                })?,
+                self.scan.clone(),
+            ));
             self.read_selection(selector)
         }
     }
