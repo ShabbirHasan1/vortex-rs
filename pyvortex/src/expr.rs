@@ -68,7 +68,7 @@ use crate::dtype::PyDType;
 ///
 /// >>> name = vortex.expr.column("name")
 /// >>> e = vortex.io.read_path("a.vortex", row_filter = name == "Joseph")
-/// >>> e.to_arrow_array(), "first"
+/// >>> e.to_arrow_array()
 /// <pyarrow.lib.StructArray object at ...>
 /// -- is_valid: all not null
 /// -- child 0 type: int64
@@ -104,7 +104,7 @@ use crate::dtype::PyDType;
 ///
 /// >>> name = vortex.expr.column("name")
 /// >>> e = vortex.io.read_path("a.vortex", row_filter = (name == "Angela") | ((age >= 20) & (age <= 30)))
-/// >>> e.to_arrow_array(), "second"
+/// >>> e.to_arrow_array()
 /// <pyarrow.lib.StructArray object at ...>
 /// -- is_valid: all not null
 /// -- child 0 type: int64
