@@ -2,7 +2,6 @@ use std::collections::VecDeque;
 use std::mem;
 use std::sync::Arc;
 
-use itertools::Itertools as _;
 use vortex_array::aliases::hash_set::HashSet;
 use vortex_array::array::{ChunkedArray, NullArray, StructArray};
 use vortex_array::compute::unary::scalar_at;
@@ -133,9 +132,7 @@ impl BufferedLayoutReader {
                             metadata.len(),
                             logical_validity.into_validity(),
                         )?
-                            .into_array();
-                        println!("predicate.expr()={}\ndtype={}\nrequired_names={}\nknown_names={}\nmissing_names={}\nnull_filled_field_names={}\nnull_filled_metadata.len()={}\n---",
-                                 predicate.expr(), metadata.dtype(), required_field_names.iter().map(|x| format!("{}", x)).join(", "), known_names.iter().map(|x| format!("{}", x)).join(", "), missing_names.iter().map(|x| format!("{}", x)).join(", "), null_filled_field_names.iter().map(|x| format!("{}", x)).join(", "), null_filled_metadata.len());
+                        .into_array();
                         predicate.expr().evaluate(&null_filled_metadata)
                     })
                 })

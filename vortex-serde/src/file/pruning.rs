@@ -124,8 +124,6 @@ fn convert_to_pruning_expression(expr: &Arc<dyn VortexExpr>) -> PruningPredicate
             .map(convert_to_pruning_expression)
             .unzip();
 
-        println!("convert_to_pruning_expression: {:?}", refses);
-
         let mut refses = refses.into_iter();
         let refs = if let Some(mut refs) = refses.next() {
             for other_refs in refses {
