@@ -55,7 +55,13 @@ impl VortexExpr for Column {
             Field::Name(n) => s.field_by_name(n),
             Field::Index(i) => s.field(*i),
         }
-        .ok_or_else(|| vortex_err!("Array doesn't contain child array {}", self.field))
+        .ok_or_else(|| {
+            vortex_err!(
+                "Array ({}) doesn't contain child array {}",
+                batch,
+                self.field
+            )
+        })
     }
 
     fn collect_references<'a>(&'a self, references: &mut HashSet<Option<&'a Field>>) {

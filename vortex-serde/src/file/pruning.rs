@@ -2,6 +2,8 @@
 #![allow(dead_code)]
 
 use std::fmt::Display;
+use std::hash::Hash;
+use std::iter::Extend;
 use std::sync::Arc;
 
 use itertools::Itertools;
@@ -84,9 +86,25 @@ impl PruningPredicate {
     }
 }
 
+fn combine_relations<L: Eq + Hash, R: Eq + Hash>(
+    left: &mut HashMap<L, HashSet<R>>,
+    right: HashMap<L, HashSet<R>>,
+) {
+    for (l, rs) in right.into_iter() {
+        left.entry(l).or_default().extend(rs.into_iter())
+    }
+}
+
 // Anything that can't be translated has to be represented as
 // boolean true expression, i.e. the value might be in that chunk
 fn convert_to_pruning_expression(expr: &Arc<dyn VortexExpr>) -> PruningPredicateStats {
+    fn not_prunable() -> PruningPredicateStats {
+        (
+            Arc::new(Literal::new(Scalar::bool(false, Nullability::NonNullable))),
+            HashMap::new(),
+        )
+    }
+
     if let Some(nexp) = expr.as_any().downcast_ref::<Not>() {
         if nexp.child().as_any().downcast_ref::<Column>().is_some() {
             return convert_column_reference(expr, true);
@@ -106,10 +124,12 @@ fn convert_to_pruning_expression(expr: &Arc<dyn VortexExpr>) -> PruningPredicate
             .map(convert_to_pruning_expression)
             .unzip();
 
+        println!("convert_to_pruning_expression: {:?}", refses);
+
         let mut refses = refses.into_iter();
         let refs = if let Some(mut refs) = refses.next() {
             for other_refs in refses {
-                refs.extend(other_refs);
+                combine_relations(&mut refs, other_refs);
             }
             refs
         } else {
@@ -126,7 +146,7 @@ fn convert_to_pruning_expression(expr: &Arc<dyn VortexExpr>) -> PruningPredicate
         if bexp.op() == Operator::Or || bexp.op() == Operator::And {
             let (rewritten_left, mut refs_lhs) = convert_to_pruning_expression(bexp.lhs());
             let (rewritten_right, refs_rhs) = convert_to_pruning_expression(bexp.rhs());
-            refs_lhs.extend(refs_rhs);
+            combine_relations(&mut refs_lhs, refs_rhs);
             return (
                 Arc::new(BinaryExpr::new(rewritten_left, bexp.op(), rewritten_right)),
                 refs_lhs,
@@ -140,12 +160,7 @@ fn convert_to_pruning_expression(expr: &Arc<dyn VortexExpr>) -> PruningPredicate
                 bexp.rhs(),
             )
             .and_then(PruningPredicateRewriter::rewrite)
-            .unwrap_or_else(|| {
-                (
-                    Arc::new(Literal::new(Scalar::bool(false, Nullability::NonNullable))),
-                    HashMap::new(),
-                )
-            });
+            .unwrap_or_else(not_prunable);
         };
 
         if let Some(col) = bexp.rhs().as_any().downcast_ref::<Column>() {
@@ -155,41 +170,23 @@ fn convert_to_pruning_expression(expr: &Arc<dyn VortexExpr>) -> PruningPredicate
                 bexp.lhs(),
             )
             .and_then(PruningPredicateRewriter::rewrite)
-            .unwrap_or_else(|| {
-                (
-                    Arc::new(Literal::new(Scalar::bool(false, Nullability::NonNullable))),
-                    HashMap::new(),
-                )
-            });
+            .unwrap_or_else(not_prunable);
         };
 
         if bexp.lhs().as_any().downcast_ref::<Identity>().is_some() {
             return PruningPredicateRewriter::try_new(None, bexp.op(), bexp.rhs())
                 .and_then(PruningPredicateRewriter::rewrite)
-                .unwrap_or_else(|| {
-                    (
-                        Arc::new(Literal::new(Scalar::bool(false, Nullability::NonNullable))),
-                        HashMap::new(),
-                    )
-                });
+                .unwrap_or_else(not_prunable);
         };
 
         if bexp.rhs().as_any().downcast_ref::<Column>().is_some() {
             return PruningPredicateRewriter::try_new(None, bexp.op().swap(), bexp.lhs())
                 .and_then(PruningPredicateRewriter::rewrite)
-                .unwrap_or_else(|| {
-                    (
-                        Arc::new(Literal::new(Scalar::bool(false, Nullability::NonNullable))),
-                        HashMap::new(),
-                    )
-                });
+                .unwrap_or_else(not_prunable);
         };
     }
 
-    (
-        Arc::new(Literal::new(Scalar::bool(false, Nullability::NonNullable))),
-        HashMap::new(),
-    )
+    not_prunable()
 }
 
 fn convert_column_reference(expr: &Arc<dyn VortexExpr>, invert: bool) -> PruningPredicateStats {
