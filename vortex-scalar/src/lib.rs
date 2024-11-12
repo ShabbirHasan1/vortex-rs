@@ -117,6 +117,10 @@ impl Scalar {
             }
         }
     }
+
+    pub fn pretty(&self) -> String {
+        self.value.pretty(&self.dtype)
+    }
 }
 
 impl PartialEq for Scalar {

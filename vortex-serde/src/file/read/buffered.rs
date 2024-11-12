@@ -89,8 +89,16 @@ impl BufferedLayoutReader {
             };
 
             println!(
-                "BufferedLayoutReader: No chunk_mask: scan.expr={:?}, metadata={:?}",
-                self.scan.expr, metadata
+                "BufferedLayoutReader: No chunk_mask: scan.expr={}, metadata={}",
+                self.scan
+                    .expr
+                    .as_ref()
+                    .map(|x| format!("{}", x))
+                    .unwrap_or_else(|| "None".to_string()),
+                metadata
+                    .as_ref()
+                    .map(|x| x.pretty())
+                    .unwrap_or_else(|| "None".to_string())
             );
             self.chunk_mask = self
                 .scan
@@ -98,10 +106,10 @@ impl BufferedLayoutReader {
                 .as_ref()
                 .zip(metadata)
                 .and_then(|(expression, metadata)| {
-                    println!("PruningPreciate: original_expr:{:?}", expression);
+                    println!("PruningPreciate: original_expr:{}", expression);
                     let predicate = PruningPredicate::try_new(expression)?;
                     println!(
-                        "PruningPreciate: predicate={:?} original_expr:{:?}",
+                        "PruningPreciate: predicate={} original_expr:{}",
                         predicate, expression
                     );
                     Some((predicate, metadata))
@@ -151,7 +159,13 @@ impl BufferedLayoutReader {
                 })
                 .transpose()?
         }
-        println!("BufferedLayoutReader: chunk_mask={:?}", self.chunk_mask);
+        println!(
+            "BufferedLayoutReader: chunk_mask={}",
+            self.chunk_mask
+                .as_ref()
+                .map(|x| x.pretty())
+                .unwrap_or_else(|| "None".to_string())
+        );
 
         // FIXME(DK): convert the pruner array to a boolean, get an iterator and zip it with the
         // children to determine if we should keep that split

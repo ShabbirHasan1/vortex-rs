@@ -36,7 +36,7 @@ impl Display for PruningPredicate {
 
 impl PruningPredicate {
     pub fn try_new(original_expr: &Arc<dyn VortexExpr>) -> Option<Self> {
-        println!("PruningPredicate::try_new: {:?}", original_expr);
+        println!("PruningPredicate::try_new: {}", original_expr);
         let (expr, required_stats) = convert_to_pruning_expression(original_expr);
         if let Some(lexp) = expr.as_any().downcast_ref::<Literal>() {
             // Is the expression constant false, i.e. prune nothing
@@ -49,7 +49,7 @@ impl PruningPredicate {
                 .map(|b| !b)
                 .unwrap_or(false)
             {
-                println!("constant false expression: {:?} {:?}", lexp, expr);
+                println!("constant false expression: {} {}", lexp, expr);
                 None
             } else {
                 Some(Self {
@@ -125,7 +125,7 @@ fn convert_to_pruning_expression(expr: &Arc<dyn VortexExpr>) -> PruningPredicate
     }
 
     if let Some(bexp) = expr.as_any().downcast_ref::<BinaryExpr>() {
-        println!("convert_to_pruning_expression: {:?}", bexp);
+        println!("convert_to_pruning_expression: {}", bexp);
         if bexp.op() == Operator::Or || bexp.op() == Operator::And {
             let (rewritten_left, mut refs_lhs) = convert_to_pruning_expression(bexp.lhs());
             let (rewritten_right, refs_rhs) = convert_to_pruning_expression(bexp.rhs());

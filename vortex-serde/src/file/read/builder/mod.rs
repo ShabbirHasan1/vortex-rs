@@ -144,7 +144,7 @@ impl<R: VortexReadAt> VortexReadBuilder<R> {
         let filter_reader = self
             .row_filter
             .map(|row_filter| {
-                println!("row_filter={:?}", row_filter);
+                println!("row_filter={}", row_filter);
                 read_layout_from_initial(
                     &initial_read,
                     &self.layout_serde,
