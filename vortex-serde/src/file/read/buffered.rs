@@ -70,6 +70,7 @@ impl BufferedLayoutReader {
                         }
                         Some(BatchRead::Batch(array)) => {
                             self.metadata_reader = Some(MetadataReader::Read(array.clone()));
+                            // println!("Metadata: {}", array.pretty());
                             Some(array)
                         }
                         None => {
@@ -171,6 +172,25 @@ impl BufferedLayoutReader {
                 })
                 .transpose()?
                 .unwrap_or(false);
+
+            // println!(
+            //     "Chunk {}: {} ({}) {}",
+            //     index,
+            //     if chunk_is_pruned {
+            //         "pruned"
+            //     } else {
+            //         "not pruned"
+            //     },
+            //     self.scan
+            //         .expr
+            //         .as_ref()
+            //         .map(|x| x.to_string())
+            //         .unwrap_or_else(|| "None".to_string()),
+            //     self.chunk_mask
+            //         .as_ref()
+            //         .map(|x| x.pretty())
+            //         .unwrap_or_else(|| "".to_string()),
+            // );
 
             if chunk_is_pruned {
                 // do not push the layout back as it is pruned.
