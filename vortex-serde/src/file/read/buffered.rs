@@ -56,7 +56,6 @@ impl BufferedLayoutReader {
     // TODO(robert): Support out of order reads
     fn buffer_read(&mut self, mask: &RowMask) -> VortexResult<Option<Vec<Message>>> {
         if self.chunk_mask.is_none() {
-            println!("BufferedLayoutReader: No chunk_mask");
             let metadata = match mem::take(&mut self.metadata_reader) {
                 // FIXME(DK): pull this out
                 metadata_reader @ Some(MetadataReader::NoMetadata) => {
@@ -66,12 +65,10 @@ impl BufferedLayoutReader {
                 Some(MetadataReader::NotYetRead(mut reader)) => {
                     match reader.read_selection(&RowMask::new_valid_between(0, self.n_chunks))? {
                         Some(BatchRead::ReadMore(messages)) => {
-                            println!("BufferedLayoutReader: No chunk_mask: need to read more");
                             self.metadata_reader = Some(MetadataReader::NotYetRead(reader));
                             return Ok(Some(messages));
                         }
                         Some(BatchRead::Batch(array)) => {
-                            println!("BufferedLayoutReader: No chunk_mask: read an array");
                             self.metadata_reader = Some(MetadataReader::Read(array.clone()));
                             Some(array)
                         }
@@ -81,37 +78,19 @@ impl BufferedLayoutReader {
                     }
                 }
                 Some(MetadataReader::Read(array)) => {
-                    println!("BufferedLayoutReader: No chunk_mask: already read an array");
                     self.metadata_reader = Some(MetadataReader::Read(array.clone()));
                     Some(array)
                 }
                 None => vortex_bail!("Called buffer_read while buffer_read was running"),
             };
 
-            println!(
-                "BufferedLayoutReader: No chunk_mask: scan.expr={}, metadata={}",
-                self.scan
-                    .expr
-                    .as_ref()
-                    .map(|x| format!("{}", x))
-                    .unwrap_or_else(|| "None".to_string()),
-                metadata
-                    .as_ref()
-                    .map(|x| x.pretty())
-                    .unwrap_or_else(|| "None".to_string())
-            );
             self.chunk_mask = self
                 .scan
                 .expr
                 .as_ref()
                 .zip(metadata)
                 .and_then(|(expression, metadata)| {
-                    println!("PruningPreciate: original_expr:{}", expression);
                     let predicate = PruningPredicate::try_new(expression)?;
-                    println!(
-                        "PruningPreciate: predicate={} original_expr:{}",
-                        predicate, expression
-                    );
                     Some((predicate, metadata))
                 })
                 .map(|(predicate, metadata)| {
@@ -159,13 +138,6 @@ impl BufferedLayoutReader {
                 })
                 .transpose()?
         }
-        println!(
-            "BufferedLayoutReader: chunk_mask={}",
-            self.chunk_mask
-                .as_ref()
-                .map(|x| x.pretty())
-                .unwrap_or_else(|| "None".to_string())
-        );
 
         // FIXME(DK): convert the pruner array to a boolean, get an iterator and zip it with the
         // children to determine if we should keep that split
@@ -194,20 +166,11 @@ impl BufferedLayoutReader {
                 .map(|chunk_mask| -> VortexResult<_> {
                     Ok(BoolScalar::try_from(&scalar_at(chunk_mask, index)?)?
                         .value()
-                        .map(|x| {
-                            // assert!(!x);
-                            x
-                        })
                         // FIXME(DK): what does a null in the array mean
                         .unwrap_or(false))
                 })
                 .transpose()?
                 .unwrap_or(false);
-
-            println!(
-                "BufferedLayoutReader: chunk_is_pruned={}, index={}",
-                chunk_is_pruned, index,
-            );
 
             if chunk_is_pruned {
                 // do not push the layout back as it is pruned.

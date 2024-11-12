@@ -89,7 +89,6 @@ impl<R: VortexReadAt> LayoutBatchStreamBuilder<R> {
         let filter_reader = self
             .row_filter
             .map(|row_filter| {
-                println!("row_filter={}", row_filter);
                 footer.layout(
                     Scan::new(Some(Arc::new(row_filter))),
                     RelativeLayoutCache::new(message_cache.clone(), footer_dtype),
