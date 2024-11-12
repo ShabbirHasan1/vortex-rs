@@ -5,7 +5,7 @@ use bytes::Bytes;
 use itertools::Itertools;
 use vortex_dtype::field::Field;
 use vortex_dtype::DType;
-use vortex_error::{vortex_bail, vortex_err, vortex_panic, VortexResult};
+use vortex_error::{vortex_bail, vortex_err, vortex_panic, VortexExpect as _, VortexResult};
 use vortex_expr::{Column, Select};
 use vortex_flatbuffers::footer;
 
@@ -230,7 +230,7 @@ impl ColumnarLayout {
             } else {
                 e.references()
                     .into_iter()
-                    .map(|x| x.unwrap())
+                    .map(|x| x.vortex_expect("scan expressions must not have Identity"))
                     .cloned()
                     .collect::<Vec<_>>()
             }
