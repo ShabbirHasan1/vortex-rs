@@ -91,8 +91,15 @@ pub fn compare(
     }
 
     // TODO(adamg): This is a placeholder until we figure out type coercion and casting
-    if !left.dtype().eq_ignore_nullability(right.dtype()) {
-        vortex_bail!("Compare operations only support arrays of the same type");
+    if !matches!(left.dtype(), DType::Null)
+        && !matches!(right.dtype(), DType::Null)
+        && !left.dtype().eq_ignore_nullability(right.dtype())
+    {
+        vortex_bail!(
+            "Compare operations only support arrays of the same type {} != {}",
+            left.dtype(),
+            right.dtype()
+        );
     }
 
     if left.is_encoding(Constant::ID) && !right.is_encoding(Constant::ID) {
