@@ -72,6 +72,18 @@ impl PruningPredicate {
     pub fn required_stats(&self) -> &HashMap<Option<Field>, HashSet<Stat>> {
         &self.required_stats
     }
+
+    // FIXME(DK): This should probably be a ref or something?
+    pub fn required_stat_field_names(&self) -> HashSet<String> {
+        self.required_stats
+            .iter()
+            .flat_map(|(key, value)| {
+                value
+                    .iter()
+                    .map(|stat| stat_column_name_str(key.as_ref(), stat))
+            })
+            .collect()
+    }
 }
 
 // Anything that can't be translated has to be represented as
@@ -240,7 +252,7 @@ impl<'a> PruningPredicateRewriter<'a> {
     }
 
     fn add_stat_reference(&mut self, stat: Stat) -> Field {
-        let new_field = stat_column_name(self.column.as_ref(), stat);
+        let new_field = stat_column_name(self.column.as_ref(), &stat);
         self.stats_to_fetch
             .entry(self.column.clone())
             .or_default()
@@ -329,7 +341,7 @@ fn replace_column_with_stat(
     stats_to_fetch: &mut HashMap<Option<Field>, HashSet<Stat>>,
 ) -> Option<Arc<dyn VortexExpr>> {
     if let Some(col) = expr.as_any().downcast_ref::<Column>() {
-        let new_field = stat_column_name(Some(col.field()), stat);
+        let new_field = stat_column_name(Some(col.field()), &stat);
         stats_to_fetch
             .entry(Some(col.field().clone()))
             .or_default()
@@ -358,12 +370,16 @@ fn replace_column_with_stat(
     None
 }
 
-pub(crate) fn stat_column_name(field: Option<&Field>, stat: Stat) -> Field {
+pub(crate) fn stat_column_name_str(field: Option<&Field>, stat: &Stat) -> String {
     match field {
-        None => Field::Name(stat.to_string()),
-        Some(Field::Name(n)) => Field::Name(format!("{n}_{stat}")),
-        Some(Field::Index(i)) => Field::Name(format!("{i}_{stat}")),
+        None => stat.to_string(),
+        Some(Field::Name(n)) => format!("{n}_{stat}"),
+        Some(Field::Index(i)) => format!("{i}_{stat}"),
     }
+}
+
+pub(crate) fn stat_column_name(field: Option<&Field>, stat: &Stat) -> Field {
+    Field::Name(stat_column_name_str(field, stat))
 }
 
 #[cfg(test)]
@@ -397,7 +413,7 @@ mod tests {
         );
         let expected_expr: Arc<dyn VortexExpr> = Arc::new(BinaryExpr::new(
             Arc::new(BinaryExpr::new(
-                Arc::new(Column::new(stat_column_name(Some(&column), Stat::Min))),
+                Arc::new(Column::new(stat_column_name(Some(&column), &Stat::Min))),
                 Operator::Gt,
                 literal_eq.clone(),
             )),
@@ -405,7 +421,7 @@ mod tests {
             Arc::new(BinaryExpr::new(
                 literal_eq,
                 Operator::Gt,
-                Arc::new(Column::new(stat_column_name(Some(&column), Stat::Max))),
+                Arc::new(Column::new(stat_column_name(Some(&column), &Stat::Max))),
             )),
         ));
         assert_eq!(*converted, *expected_expr.as_any());
@@ -437,15 +453,15 @@ mod tests {
         );
         let expected_expr: Arc<dyn VortexExpr> = Arc::new(BinaryExpr::new(
             Arc::new(BinaryExpr::new(
-                Arc::new(Column::new(stat_column_name(Some(&column), Stat::Min))),
+                Arc::new(Column::new(stat_column_name(Some(&column), &Stat::Min))),
                 Operator::Gt,
-                Arc::new(Column::new(stat_column_name(Some(&other_col), Stat::Max))),
+                Arc::new(Column::new(stat_column_name(Some(&other_col), &Stat::Max))),
             )),
             Operator::Or,
             Arc::new(BinaryExpr::new(
-                Arc::new(Column::new(stat_column_name(Some(&other_col), Stat::Min))),
+                Arc::new(Column::new(stat_column_name(Some(&other_col), &Stat::Min))),
                 Operator::Gt,
-                Arc::new(Column::new(stat_column_name(Some(&column), Stat::Max))),
+                Arc::new(Column::new(stat_column_name(Some(&column), &Stat::Max))),
             )),
         ));
         assert_eq!(*converted, *expected_expr.as_any());
@@ -478,22 +494,22 @@ mod tests {
         let expected_expr: Arc<dyn VortexExpr> = Arc::new(BinaryExpr::new(
             Arc::new(BinaryExpr::new(
                 Arc::new(BinaryExpr::new(
-                    Arc::new(Column::new(stat_column_name(Some(&column), Stat::Min))),
+                    Arc::new(Column::new(stat_column_name(Some(&column), &Stat::Min))),
                     Operator::Eq,
-                    Arc::new(Column::new(stat_column_name(Some(&column), Stat::Max))),
+                    Arc::new(Column::new(stat_column_name(Some(&column), &Stat::Max))),
                 )),
                 Operator::And,
                 Arc::new(BinaryExpr::new(
-                    Arc::new(Column::new(stat_column_name(Some(&other_col), Stat::Min))),
+                    Arc::new(Column::new(stat_column_name(Some(&other_col), &Stat::Min))),
                     Operator::Eq,
-                    Arc::new(Column::new(stat_column_name(Some(&other_col), Stat::Max))),
+                    Arc::new(Column::new(stat_column_name(Some(&other_col), &Stat::Max))),
                 )),
             )),
             Operator::And,
             Arc::new(BinaryExpr::new(
-                Arc::new(Column::new(stat_column_name(Some(&column), Stat::Min))),
+                Arc::new(Column::new(stat_column_name(Some(&column), &Stat::Min))),
                 Operator::Eq,
-                Arc::new(Column::new(stat_column_name(Some(&other_col), Stat::Min))),
+                Arc::new(Column::new(stat_column_name(Some(&other_col), &Stat::Min))),
             )),
         ));
 
@@ -520,9 +536,9 @@ mod tests {
             ])
         );
         let expected_expr: Arc<dyn VortexExpr> = Arc::new(BinaryExpr::new(
-            Arc::new(Column::new(stat_column_name(Some(&column), Stat::Max))),
+            Arc::new(Column::new(stat_column_name(Some(&column), &Stat::Max))),
             Operator::Lte,
-            Arc::new(Column::new(stat_column_name(Some(&other_col), Stat::Min))),
+            Arc::new(Column::new(stat_column_name(Some(&other_col), &Stat::Min))),
         ));
         assert_eq!(*converted, *expected_expr.as_any());
     }
@@ -543,7 +559,7 @@ mod tests {
             HashMap::from_iter([(Some(column.clone()), HashSet::from_iter([Stat::Max])),])
         );
         let expected_expr: Arc<dyn VortexExpr> = Arc::new(BinaryExpr::new(
-            Arc::new(Column::new(stat_column_name(Some(&column), Stat::Max))),
+            Arc::new(Column::new(stat_column_name(Some(&column), &Stat::Max))),
             Operator::Lte,
             other_col.clone(),
         ));
@@ -570,9 +586,9 @@ mod tests {
             ])
         );
         let expected_expr: Arc<dyn VortexExpr> = Arc::new(BinaryExpr::new(
-            Arc::new(Column::new(stat_column_name(Some(&column), Stat::Min))),
+            Arc::new(Column::new(stat_column_name(Some(&column), &Stat::Min))),
             Operator::Gte,
-            Arc::new(Column::new(stat_column_name(Some(&other_col), Stat::Max))),
+            Arc::new(Column::new(stat_column_name(Some(&other_col), &Stat::Max))),
         ));
         assert_eq!(*converted, *expected_expr.as_any());
     }
@@ -593,7 +609,7 @@ mod tests {
             HashMap::from_iter([(Some(column.clone()), HashSet::from_iter([Stat::Min]))])
         );
         let expected_expr: Arc<dyn VortexExpr> = Arc::new(BinaryExpr::new(
-            Arc::new(Column::new(stat_column_name(Some(&column), Stat::Min))),
+            Arc::new(Column::new(stat_column_name(Some(&column), &Stat::Min))),
             Operator::Gte,
             other_col.clone(),
         ));

@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use vortex_dtype::field::Field;
-use vortex_dtype::{DType, ExtDType, FieldNames, PType};
+use vortex_dtype::{DType, ExtDType, FieldNames, PType, StructDType};
 use vortex_error::{vortex_panic, VortexExpect as _, VortexResult};
 
 use crate::iter::{AccessorRef, VectorizedArrayIter};
@@ -271,6 +271,13 @@ pub trait Utf8ArrayTrait: ArrayTrait {}
 pub trait BinaryArrayTrait: ArrayTrait {}
 
 pub trait StructArrayTrait: ArrayTrait {
+    fn struct_dtype(&self) -> &StructDType {
+        let DType::Struct(st, _) = self.dtype() else {
+            unreachable!()
+        };
+        st
+    }
+
     fn names(&self) -> &FieldNames {
         let DType::Struct(st, _) = self.dtype() else {
             unreachable!()

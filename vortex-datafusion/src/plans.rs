@@ -23,7 +23,7 @@ use vortex_array::arrow::FromArrowArray;
 use vortex_array::compute::take;
 use vortex_array::{Array, IntoArrayVariant, IntoCanonical};
 use vortex_dtype::field::Field;
-use vortex_error::{vortex_err, vortex_panic, VortexError};
+use vortex_error::{vortex_err, vortex_panic, VortexError, VortexExpect};
 use vortex_expr::VortexExpr;
 
 /// Physical plan operator that applies a set of [filters][Expr] against the input, producing a
@@ -120,7 +120,13 @@ impl ExecutionPlan for RowSelectorExec {
             .into());
         }
 
-        let filter_projection = self.filter_expr.references().into_iter().cloned().collect();
+        let filter_projection = self
+            .filter_expr
+            .references()
+            .into_iter()
+            .map(|x| x.vortex_expect("DataFusion plans should have no Identity"))
+            .cloned()
+            .collect();
         Ok(Box::pin(RowIndicesStream {
             chunked_array: self.chunked_array.clone(),
             chunk_idx: 0,
