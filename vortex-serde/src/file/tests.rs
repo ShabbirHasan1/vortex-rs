@@ -428,14 +428,14 @@ async fn filter_string_chunked() {
         .unwrap()
         .into_array();
 
-    let written_bytes = LayoutWriter::new(Vec::new())
+    let written_bytes = VortexFileWriter::new(Vec::new())
         .write_array_columns(array)
         .await
         .unwrap()
         .finalize()
         .await
         .unwrap();
-    let actual_array = LayoutBatchStreamBuilder::new(written_bytes, LayoutDeserializer::default())
+    let actual_array = VortexReadBuilder::new(written_bytes, LayoutDeserializer::default())
         .with_row_filter(RowFilter::new(Arc::new(BinaryExpr::new(
             Arc::new(Column::new(Field::from("name"))),
             Operator::Eq,
