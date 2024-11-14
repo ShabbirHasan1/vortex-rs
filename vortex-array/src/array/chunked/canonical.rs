@@ -133,7 +133,7 @@ fn swizzle_struct_chunks(
     for (field_idx, field_dtype) in struct_dtype.dtypes().iter().enumerate() {
         let field_chunks = chunks.iter().map(|c| c.with_dyn(|d|
             d.as_struct_array_unchecked()
-                .field(field_idx)
+                .field_by_index(field_idx)
                 .ok_or_else(|| vortex_err!("All chunks must have same dtype; missing field at index {}, current chunk dtype: {}", field_idx, c.dtype())),
         )).collect::<VortexResult<Vec<_>>>()?;
         let field_array = ChunkedArray::try_new(field_chunks, field_dtype.clone())?;

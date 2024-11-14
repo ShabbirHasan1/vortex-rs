@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use itertools::Itertools;
-use vortex_dtype::field::Field;
+use vortex_dtype::field::{Field, FieldPath};
 use vortex_dtype::DType;
-use vortex_error::{vortex_bail, vortex_err, vortex_panic, VortexExpect as _, VortexResult};
+use vortex_error::{vortex_bail, vortex_err, vortex_panic, VortexResult};
 use vortex_expr::{Column, Select};
 use vortex_flatbuffers::footer;
 
@@ -89,7 +89,7 @@ impl ColumnarLayout {
 
         refs.into_iter()
             .map(|field| {
-                let resolved_child = lazy_dtype.resolve_field(&field)?;
+                let resolved_child = lazy_dtype.resolve_field_path(&field)?;
                 let child_loc = fb_children.get(resolved_child)._tab.loc();
 
                 self.layout_serde.read_layout(
@@ -120,7 +120,7 @@ impl ColumnarLayout {
             .into_iter()
             .zip_eq(s.names().iter().cloned().zip_eq(s.dtypes().iter().cloned()))
         {
-            let resolved_child = lazy_dtype.resolve_field(&field)?;
+            let resolved_child = lazy_dtype.resolve_field_path(&field)?;
             let child_loc = fb_children.get(resolved_child)._tab.loc();
             let projected_expr = self
                 .scan
@@ -160,7 +160,7 @@ impl ColumnarLayout {
                         e,
                         &unhandled_names
                             .iter()
-                            .map(|n| Field::from(n.as_ref()))
+                            .map(|n| FieldPath::from(Field::from(n.as_ref())))
                             .collect::<Vec<_>>(),
                     )
                 })
@@ -205,22 +205,22 @@ impl ColumnarLayout {
     }
 
     /// Get fields referenced by scan expression along with their dtype
-    fn fields_with_dtypes(&self) -> VortexResult<(Vec<Field>, Arc<LazilyDeserializedDType>)> {
+    fn fields_with_dtypes(&self) -> VortexResult<(Vec<FieldPath>, Arc<LazilyDeserializedDType>)> {
         let fb_children = self.flatbuffer().children().unwrap_or_default();
-        let field_refs = self.scan_fields();
-        let lazy_dtype = field_refs
-            .as_ref()
-            .map(|e| self.message_cache.dtype().project(e))
-            .unwrap_or_else(|| Ok(self.message_cache.dtype().clone()))?;
+        let Some(field_refs) = self.scan_fields() else {
+            let field_paths = (0..fb_children.len())
+                .map(Field::from)
+                .map(FieldPath::from)
+                .collect();
+            return Ok((field_paths, self.message_cache.dtype().clone()));
+        };
 
-        Ok((
-            field_refs.unwrap_or_else(|| (0..fb_children.len()).map(Field::from).collect()),
-            lazy_dtype,
-        ))
+        let lazy_dtype = self.message_cache.dtype().project(field_refs)?;
+        Ok((field_refs, lazy_dtype))
     }
 
     /// Get fields referenced by scan expression preserving order if we're using select to project
-    fn scan_fields(&self) -> Option<Vec<Field>> {
+    fn scan_fields(&self) -> Option<Vec<FieldPath>> {
         self.scan.expr.as_ref().map(|e| {
             if let Some(se) = e.as_any().downcast_ref::<Select>() {
                 match se {
@@ -228,11 +228,7 @@ impl ColumnarLayout {
                     Select::Exclude(_) => vortex_panic!("Select::Exclude is not supported"),
                 }
             } else {
-                e.references()
-                    .into_iter()
-                    .map(|x| x.vortex_expect("scan expressions must not have Identity"))
-                    .cloned()
-                    .collect::<Vec<_>>()
+                e.references().into_iter().cloned().collect::<Vec<_>>()
             }
         })
     }

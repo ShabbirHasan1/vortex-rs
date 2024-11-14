@@ -2,6 +2,7 @@ use std::sync::{Arc, RwLock};
 
 use initial_read::{read_initial_bytes, read_layout_from_initial};
 use vortex_array::{Array, ArrayDType};
+use vortex_dtype::field::FieldPath;
 use vortex_dtype::flatbuffers::deserialize_and_project;
 use vortex_dtype::DType;
 use vortex_error::{vortex_err, VortexResult};
@@ -136,7 +137,9 @@ impl<R: VortexReadAt> VortexReadBuilder<R> {
             &self.layout_serde,
             Scan::new(match read_projection {
                 Projection::All => None,
-                Projection::Flat(p) => Some(Arc::new(Select::include(p))),
+                Projection::Flat(p) => Some(Arc::new(Select::include(
+                    p.into_iter().map(FieldPath::from).collect(),
+                ))),
             }),
             RelativeLayoutCache::new(message_cache.clone(), lazy_dtype.clone()),
         )?;

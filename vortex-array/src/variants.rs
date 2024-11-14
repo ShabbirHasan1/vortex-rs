@@ -5,9 +5,9 @@
 
 use std::sync::Arc;
 
-use vortex_dtype::field::Field;
+use vortex_dtype::field::{Field, FieldPath};
 use vortex_dtype::{DType, ExtDType, FieldNames, PType, StructDType};
-use vortex_error::{vortex_panic, VortexExpect as _, VortexResult};
+use vortex_error::{vortex_err, vortex_panic, VortexExpect as _, VortexResult};
 
 use crate::iter::{AccessorRef, VectorizedArrayIter};
 use crate::{Array, ArrayTrait};
@@ -296,8 +296,34 @@ pub trait StructArrayTrait: ArrayTrait {
         self.names().len()
     }
 
+    /// Return the given field.
+    ///
+    /// Returns an error if the field does not exist.
+    fn field(&self, field: &Field) -> VortexResult<Array> {
+        match field {
+            Field::Name(name) => self.field_by_name(name),
+            Field::Index(index) => self.field_by_index(*index),
+        }
+        .ok_or_else(|| {
+            vortex_err!(
+                "Array (dtype: {}) doesn't contain child array {}",
+                self.dtype(),
+                field
+            )
+        })
+    }
+
+    // /// Return the possibly nested field identified by the path.
+    // fn field_path(&self, field_path: &FieldPath) -> VortexResult<Array> {
+    //     let mut array = self;
+    //     for field in field_path.as_ref() {
+    //         array = array.with_dyn(|array| array.as_struct().field(field));
+    //     }
+    //     Ok(array)
+    // }
+
     /// Return a field's array by index
-    fn field(&self, idx: usize) -> Option<Array>;
+    fn field_by_index(&self, idx: usize) -> Option<Array>;
 
     /// Return a field's array by name
     fn field_by_name(&self, name: &str) -> Option<Array> {
@@ -306,10 +332,12 @@ pub trait StructArrayTrait: ArrayTrait {
             .iter()
             .position(|field_name| field_name.as_ref() == name);
 
-        field_idx.and_then(|field_idx| self.field(field_idx))
+        field_idx.and_then(|field_idx| self.field_by_index(field_idx))
     }
 
     fn project(&self, projection: &[Field]) -> VortexResult<Array>;
+
+    fn project_paths(&self, projection: &[FieldPath]) -> VortexResult<Array>;
 }
 
 pub trait ListArrayTrait: ArrayTrait {}

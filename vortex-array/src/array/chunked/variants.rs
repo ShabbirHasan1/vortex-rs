@@ -77,10 +77,11 @@ impl Utf8ArrayTrait for ChunkedArray {}
 impl BinaryArrayTrait for ChunkedArray {}
 
 impl StructArrayTrait for ChunkedArray {
-    fn field(&self, idx: usize) -> Option<Array> {
+    fn field_by_index(&self, idx: usize) -> Option<Array> {
         let mut chunks = Vec::with_capacity(self.nchunks());
         for chunk in self.chunks() {
-            chunks.push(chunk.with_dyn(|a| a.as_struct_array().and_then(|s| s.field(idx)))?);
+            chunks
+                .push(chunk.with_dyn(|a| a.as_struct_array().and_then(|s| s.field_by_index(idx)))?);
         }
 
         let projected_dtype = self.dtype().as_struct().and_then(|s| s.dtypes().get(idx))?;
@@ -116,6 +117,10 @@ impl StructArrayTrait for ChunkedArray {
             DType::Struct(projected_dtype, self.dtype().nullability()),
         )
         .map(|a| a.into_array())
+    }
+
+    fn project_paths(&self, _projection: &[vortex_dtype::field::FieldPath]) -> VortexResult<Array> {
+        todo!()
     }
 }
 

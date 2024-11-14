@@ -79,10 +79,10 @@ impl Utf8ArrayTrait for SparseArray {}
 impl BinaryArrayTrait for SparseArray {}
 
 impl StructArrayTrait for SparseArray {
-    fn field(&self, idx: usize) -> Option<Array> {
+    fn field_by_index(&self, idx: usize) -> Option<Array> {
         let values = self
             .values()
-            .with_dyn(|s| s.as_struct_array().and_then(|s| s.field(idx)))?;
+            .with_dyn(|s| s.as_struct_array().and_then(|s| s.field_by_index(idx)))?;
         let scalar = StructScalar::try_new(self.dtype(), self.fill_value())
             .ok()?
             .field_by_idx(idx)?;
@@ -116,6 +116,58 @@ impl StructArrayTrait for SparseArray {
             scalar.value().clone(),
         )
         .map(|a| a.into_array())
+    }
+
+    fn project_paths(&self, _projection: &[vortex_dtype::field::FieldPath]) -> VortexResult<Array> {
+        todo!()
+    }
+
+    fn struct_dtype(&self) -> &vortex_dtype::StructDType {
+        let DType::Struct(st, _) = self.dtype() else {
+            std::unreachable!()
+        };
+        st
+    }
+
+    fn names(&self) -> &vortex_dtype::FieldNames {
+        let DType::Struct(st, _) = self.dtype() else {
+            std::unreachable!()
+        };
+        st.names()
+    }
+
+    fn dtypes(&self) -> &[DType] {
+        let DType::Struct(st, _) = self.dtype() else {
+            std::unreachable!()
+        };
+        st.dtypes()
+    }
+
+    fn nfields(&self) -> usize {
+        self.names().len()
+    }
+
+    fn field(&self, field: &Field) -> VortexResult<Array> {
+        match field {
+            Field::Name(name) => self.field_by_name(name),
+            Field::Index(index) => self.field_by_index(*index),
+        }
+        .ok_or_else(|| {
+            vortex_err!(
+                "Array (dtype: {}) doesn't contain child array {}",
+                self.dtype(),
+                field
+            )
+        })
+    }
+
+    fn field_by_name(&self, name: &str) -> Option<Array> {
+        let field_idx = self
+            .names()
+            .iter()
+            .position(|field_name| field_name.as_ref() == name);
+
+        field_idx.and_then(|field_idx| self.field_by_index(field_idx))
     }
 }
 

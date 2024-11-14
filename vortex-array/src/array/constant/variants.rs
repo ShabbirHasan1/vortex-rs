@@ -191,7 +191,7 @@ impl Utf8ArrayTrait for ConstantArray {}
 impl BinaryArrayTrait for ConstantArray {}
 
 impl StructArrayTrait for ConstantArray {
-    fn field(&self, idx: usize) -> Option<Array> {
+    fn field_by_index(&self, idx: usize) -> Option<Array> {
         StructScalar::try_new(self.dtype(), self.scalar_value())
             .ok()?
             .field_by_idx(idx)
@@ -204,6 +204,10 @@ impl StructArrayTrait for ConstantArray {
             self.len(),
         )
         .into_array())
+    }
+
+    fn project_paths(&self, _projection: &[vortex_dtype::field::FieldPath]) -> VortexResult<Array> {
+        todo!()
     }
 }
 

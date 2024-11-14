@@ -38,7 +38,7 @@ impl StructArray {
 
     pub fn children(&self) -> impl Iterator<Item = Array> + '_ {
         (0..self.nfields()).map(move |idx| {
-            self.field(idx).unwrap_or_else(|| {
+            self.field_by_index(idx).unwrap_or_else(|| {
                 vortex_panic!("Field {} not found, nfields: {}", idx, self.nfields())
             })
         })
@@ -124,7 +124,7 @@ impl StructArray {
 
             names.push(self.names()[idx].clone());
             children.push(
-                self.field(idx)
+                self.field_by_index(idx)
                     .ok_or_else(|| vortex_err!(OutOfBounds: idx, 0, self.dtypes().len()))?,
             );
         }
@@ -147,7 +147,7 @@ impl ArrayVariants for StructArray {
 }
 
 impl StructArrayTrait for StructArray {
-    fn field(&self, idx: usize) -> Option<Array> {
+    fn field_by_index(&self, idx: usize) -> Option<Array> {
         self.dtypes().get(idx).map(|dtype| {
             self.as_ref()
                 .child(idx, dtype, self.len())
@@ -157,6 +157,10 @@ impl StructArrayTrait for StructArray {
 
     fn project(&self, projection: &[Field]) -> VortexResult<Array> {
         self.project(projection).map(|a| a.into_array())
+    }
+
+    fn project_paths(&self, _projection: &[vortex_dtype::field::FieldPath]) -> VortexResult<Array> {
+        todo!()
     }
 }
 
@@ -181,7 +185,7 @@ impl AcceptArrayVisitor for StructArray {
     fn accept(&self, visitor: &mut dyn ArrayVisitor) -> VortexResult<()> {
         for (idx, name) in self.names().iter().enumerate() {
             let child = self
-                .field(idx)
+                .field_by_index(idx)
                 .ok_or_else(|| vortex_err!(OutOfBounds: idx, 0, self.nfields()))?;
             visitor.visit_child(&format!("\"{}\"", name), &child)?;
         }

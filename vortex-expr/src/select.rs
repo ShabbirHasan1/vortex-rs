@@ -4,23 +4,23 @@ use std::fmt::Display;
 use itertools::Itertools;
 use vortex_array::aliases::hash_set::HashSet;
 use vortex_array::Array;
-use vortex_dtype::field::Field;
+use vortex_dtype::field::FieldPath;
 use vortex_error::{vortex_err, VortexResult};
 
 use crate::{unbox_any, VortexExpr};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Select {
-    Include(Vec<Field>),
-    Exclude(Vec<Field>),
+    Include(Vec<FieldPath>),
+    Exclude(Vec<FieldPath>),
 }
 
 impl Select {
-    pub fn include(columns: Vec<Field>) -> Self {
+    pub fn include(columns: Vec<FieldPath>) -> Self {
         Self::Include(columns)
     }
 
-    pub fn exclude(columns: Vec<Field>) -> Self {
+    pub fn exclude(columns: Vec<FieldPath>) -> Self {
         Self::Exclude(columns)
     }
 }
@@ -45,36 +45,21 @@ impl VortexExpr for Select {
                 .as_struct_array()
                 .ok_or_else(|| vortex_err!("Not a struct array"))?;
             match self {
-                Select::Include(f) => st.project(f),
+                Select::Include(f) => st.project_paths(f),
                 Select::Exclude(e) => {
-                    let normalized_exclusion = e
-                        .iter()
-                        .map(|ef| match ef {
-                            Field::Name(n) => Ok(n.as_str()),
-                            Field::Index(i) => st
-                                .names()
-                                .get(*i)
-                                .map(|s| &**s)
-                                .ok_or_else(|| vortex_err!("Column doesn't exist")),
-                        })
-                        .collect::<VortexResult<HashSet<_>>>()?;
-                    let included_names = st
-                        .names()
-                        .iter()
-                        .filter(|f| !normalized_exclusion.contains(&&***f))
-                        .map(|f| Field::from(&**f))
-                        .collect::<Vec<_>>();
-                    st.project(&included_names)
+                    let struct_dtype = st.struct_dtype().exclude_paths(e)?;
+                    let included_paths = struct_dtype.to_field_paths()?;
+                    st.project_paths(&included_paths)
                 }
             }
         })
     }
 
-    fn collect_references<'a>(&'a self, references: &mut HashSet<Option<&'a Field>>) {
+    fn collect_references<'a>(&'a self, references: &mut HashSet<&'a FieldPath>) {
         match self {
-            Select::Include(f) => references.extend(f.iter().map(Some)),
+            Select::Include(f) => references.extend(f.iter()),
             // It's weird that we treat the references of exclusions and inclusions the same, we need to have a wrapper around Field in the return
-            Select::Exclude(e) => references.extend(e.iter().map(Some)),
+            Select::Exclude(e) => references.extend(e.iter()),
         }
     }
 }

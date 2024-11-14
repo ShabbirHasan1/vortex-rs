@@ -21,7 +21,7 @@ pub use not::*;
 pub use operators::*;
 pub use select::*;
 use vortex_array::Array;
-use vortex_dtype::field::Field;
+use vortex_dtype::field::FieldPath;
 use vortex_error::{VortexExpect, VortexResult};
 
 /// Represents logical operation on [`Array`]s
@@ -33,10 +33,10 @@ pub trait VortexExpr: Debug + Send + Sync + PartialEq<dyn Any> + Display {
     fn evaluate(&self, batch: &Array) -> VortexResult<Array>;
 
     /// Accumulate all field references from this expression and its children in the provided set
-    fn collect_references<'a>(&'a self, _references: &mut HashSet<Option<&'a Field>>) {}
+    fn collect_references<'a>(&'a self, _references: &mut HashSet<&'a FieldPath>) {}
 
     /// Accumulate all field references from this expression and its children in a new set
-    fn references(&self) -> HashSet<Option<&Field>> {
+    fn references(&self) -> HashSet<&FieldPath> {
         let mut refs = HashSet::new();
         self.collect_references(&mut refs);
         refs

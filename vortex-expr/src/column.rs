@@ -5,24 +5,34 @@ use vortex_array::aliases::hash_set::HashSet;
 use vortex_array::array::StructArray;
 use vortex_array::variants::StructArrayTrait;
 use vortex_array::Array;
-use vortex_dtype::field::Field;
-use vortex_error::{vortex_err, VortexResult};
+use vortex_dtype::field::{Field, FieldPath};
+use vortex_error::VortexResult;
 
 use crate::{unbox_any, VortexExpr};
 
 #[derive(Debug, PartialEq, Hash, Clone, Eq)]
 pub struct Column {
-    field: Field,
+    field_path: FieldPath,
 }
 
 impl Column {
     pub fn new(field: Field) -> Self {
-        Self { field }
+        Self {
+            field_path: FieldPath::from(field),
+        }
     }
 
-    pub fn field(&self) -> &Field {
-        &self.field
+    pub fn new_path(field_path: FieldPath) -> Self {
+        Self { field_path }
     }
+
+    pub fn field_path(&self) -> &FieldPath {
+        &self.field_path
+    }
+
+    // pub fn field(&self) -> &Field {
+    //     &self.field
+    // }
 }
 
 impl From<String> for Column {
@@ -39,7 +49,7 @@ impl From<usize> for Column {
 
 impl Display for Column {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.field)
+        write!(f, "{}", self.field_path)
     }
 }
 
@@ -49,23 +59,16 @@ impl VortexExpr for Column {
     }
 
     fn evaluate(&self, batch: &Array) -> VortexResult<Array> {
-        let s = StructArray::try_from(batch)?;
-
-        match &self.field {
-            Field::Name(n) => s.field_by_name(n),
-            Field::Index(i) => s.field(*i),
+        let mut array = batch.clone();
+        for field in self.field_path.as_ref() {
+            let struct_array = StructArray::try_from(array)?;
+            array = struct_array.field(field)?;
         }
-        .ok_or_else(|| {
-            vortex_err!(
-                "Array ({}) doesn't contain child array {}",
-                batch,
-                self.field
-            )
-        })
+        Ok(array)
     }
 
-    fn collect_references<'a>(&'a self, references: &mut HashSet<Option<&'a Field>>) {
-        references.insert(Some(self.field()));
+    fn collect_references<'a>(&'a self, references: &mut HashSet<&'a FieldPath>) {
+        references.insert(self.field_path());
     }
 }
 

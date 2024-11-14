@@ -10,7 +10,7 @@ use vortex_array::compute::and_kleene;
 use vortex_array::stats::ArrayStatistics;
 use vortex_array::validity::Validity;
 use vortex_array::{Array, IntoArray, IntoArrayVariant};
-use vortex_dtype::field::Field;
+use vortex_dtype::field::FieldPath;
 use vortex_error::{VortexExpect, VortexResult};
 use vortex_expr::{split_conjunction, unbox_any, VortexExpr};
 
@@ -31,7 +31,7 @@ impl RowFilter {
         Self { conjunction }
     }
 
-    pub fn only_fields(&self, fields: &[Field]) -> Option<Self> {
+    pub fn only_fields(&self, fields: &[FieldPath]) -> Option<Self> {
         let conj = self
             .conjunction
             .iter()
@@ -78,7 +78,7 @@ impl VortexExpr for RowFilter {
         null_as_false(mask.into_bool()?)
     }
 
-    fn collect_references<'a>(&'a self, references: &mut HashSet<Option<&'a Field>>) {
+    fn collect_references<'a>(&'a self, references: &mut HashSet<&'a FieldPath>) {
         for expr in self.conjunction.iter() {
             expr.collect_references(references);
         }

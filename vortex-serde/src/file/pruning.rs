@@ -3,14 +3,14 @@
 
 use std::fmt::Display;
 use std::hash::Hash;
-use std::iter::Extend;
+use std::iter::{self, Extend};
 use std::sync::Arc;
 
 use itertools::Itertools;
 use vortex_array::aliases::hash_map::HashMap;
 use vortex_array::aliases::hash_set::HashSet;
 use vortex_array::stats::Stat;
-use vortex_dtype::field::Field;
+use vortex_dtype::field::{Field, FieldPath, FieldPathSet};
 use vortex_dtype::Nullability;
 use vortex_expr::{BinaryExpr, Column, Identity, Literal, Not, Operator, VortexExpr};
 use vortex_scalar::Scalar;
@@ -20,7 +20,7 @@ use super::RowFilter;
 #[derive(Debug, Clone)]
 pub struct PruningPredicate {
     expr: Arc<dyn VortexExpr>,
-    required_stats: HashMap<Option<Field>, HashSet<Stat>>,
+    required_stats: HashMap<FieldPath, HashSet<Stat>>,
 }
 
 impl Display for PruningPredicate {
@@ -30,10 +30,7 @@ impl Display for PruningPredicate {
             "PruningPredicate({}, {{{}}})",
             self.expr,
             self.required_stats.iter().format_with(",", |(k, v), fmt| {
-                match k {
-                    Some(k) => fmt(&format_args!("{k}: {{{}}}", v.iter().format(","))),
-                    None => fmt(&format_args!("[]: {{{}}}", v.iter().format(","))),
-                }
+                fmt(&format_args!("{k}: {{{}}}", v.iter().format(",")))
             })
         )
     }
@@ -72,20 +69,13 @@ impl PruningPredicate {
         &self.expr
     }
 
-    pub fn required_stats(&self) -> &HashMap<Option<Field>, HashSet<Stat>> {
-        &self.required_stats
-    }
-
     // FIXME(DK): This should probably be a ref or something?
-    pub fn required_stat_field_names(&self) -> HashSet<String> {
-        self.required_stats
-            .iter()
-            .flat_map(|(key, value)| {
-                value
-                    .iter()
-                    .map(|stat| stat_column_name_str(key.as_ref(), stat))
-            })
-            .collect()
+    pub fn required_stat_field_names(&self) -> FieldPathSet {
+        FieldPathSet::from_iter(
+            self.required_stats
+                .iter()
+                .flat_map(|(key, value)| value.iter().map(|stat| stat_field_path_name(key, stat))),
+        )
     }
 }
 
@@ -156,7 +146,7 @@ fn convert_to_pruning_expression(expr: &Arc<dyn VortexExpr>) -> PruningPredicate
 
         if let Some(col) = bexp.lhs().as_any().downcast_ref::<Column>() {
             return PruningPredicateRewriter::try_new(
-                Some(col.field().clone()),
+                col.field_path().clone(),
                 bexp.op(),
                 bexp.rhs(),
             )
@@ -166,7 +156,7 @@ fn convert_to_pruning_expression(expr: &Arc<dyn VortexExpr>) -> PruningPredicate
 
         if let Some(col) = bexp.rhs().as_any().downcast_ref::<Column>() {
             return PruningPredicateRewriter::try_new(
-                Some(col.field().clone()),
+                col.field_path().clone(),
                 bexp.op().swap(),
                 bexp.lhs(),
             )
@@ -175,15 +165,19 @@ fn convert_to_pruning_expression(expr: &Arc<dyn VortexExpr>) -> PruningPredicate
         };
 
         if bexp.lhs().as_any().downcast_ref::<Identity>().is_some() {
-            return PruningPredicateRewriter::try_new(None, bexp.op(), bexp.rhs())
+            return PruningPredicateRewriter::try_new(FieldPath::empty(), bexp.op(), bexp.rhs())
                 .and_then(PruningPredicateRewriter::rewrite)
                 .unwrap_or_else(not_prunable);
         };
 
         if bexp.rhs().as_any().downcast_ref::<Column>().is_some() {
-            return PruningPredicateRewriter::try_new(None, bexp.op().swap(), bexp.lhs())
-                .and_then(PruningPredicateRewriter::rewrite)
-                .unwrap_or_else(not_prunable);
+            return PruningPredicateRewriter::try_new(
+                FieldPath::empty(),
+                bexp.op().swap(),
+                bexp.lhs(),
+            )
+            .and_then(PruningPredicateRewriter::rewrite)
+            .unwrap_or_else(not_prunable);
         };
     }
 
@@ -216,25 +210,25 @@ fn convert_column_reference(expr: &Arc<dyn VortexExpr>, invert: bool) -> Pruning
 }
 
 struct PruningPredicateRewriter<'a> {
-    column: Option<Field>,
+    column: FieldPath,
     operator: Operator,
     other_exp: &'a Arc<dyn VortexExpr>,
     // FIXME(DK): probably want a rewriter specifically for Identity since the hashmap is a bit silly
-    stats_to_fetch: HashMap<Option<Field>, HashSet<Stat>>,
+    stats_to_fetch: HashMap<FieldPath, HashSet<Stat>>,
 }
 
-type StatReferencesByField = HashMap<Option<Field>, HashSet<Stat>>;
+type StatReferencesByField = HashMap<FieldPath, HashSet<Stat>>;
 type PruningPredicateStats = (Arc<dyn VortexExpr>, StatReferencesByField);
 
 impl<'a> PruningPredicateRewriter<'a> {
     pub fn try_new(
-        column: Option<Field>,
+        column: FieldPath,
         operator: Operator,
         other_exp: &'a Arc<dyn VortexExpr>,
     ) -> Option<Self> {
         // TODO(robert): Simplify expression to guarantee that each column is not compared to itself
         //  For majority of cases self column references are likely not prunable
-        if other_exp.references().contains(&column.as_ref()) {
+        if other_exp.references().contains(&column) {
             return None;
         }
 
@@ -246,8 +240,8 @@ impl<'a> PruningPredicateRewriter<'a> {
         })
     }
 
-    fn add_stat_reference(&mut self, stat: Stat) -> Field {
-        let new_field = stat_column_name(self.column.as_ref(), &stat);
+    fn add_stat_reference(&mut self, stat: Stat) -> FieldPath {
+        let new_field = stat_field_path_name(&self.column, &stat);
         self.stats_to_fetch
             .entry(self.column.clone())
             .or_default()
@@ -263,8 +257,8 @@ impl<'a> PruningPredicateRewriter<'a> {
     fn rewrite(mut self) -> Option<PruningPredicateStats> {
         let expr: Option<Arc<dyn VortexExpr>> = match self.operator {
             Operator::Eq => {
-                let min_col = Arc::new(Column::new(self.add_stat_reference(Stat::Min)));
-                let max_col = Arc::new(Column::new(self.add_stat_reference(Stat::Max)));
+                let min_col = Arc::new(Column::new_path(self.add_stat_reference(Stat::Min)));
+                let max_col = Arc::new(Column::new_path(self.add_stat_reference(Stat::Max)));
                 let replaced_max = self.rewrite_other_exp(Stat::Max);
                 let replaced_min = self.rewrite_other_exp(Stat::Min);
 
@@ -275,8 +269,8 @@ impl<'a> PruningPredicateRewriter<'a> {
                 )))
             }
             Operator::NotEq => {
-                let min_col = Arc::new(Column::new(self.add_stat_reference(Stat::Min)));
-                let max_col = Arc::new(Column::new(self.add_stat_reference(Stat::Max)));
+                let min_col = Arc::new(Column::new_path(self.add_stat_reference(Stat::Min)));
+                let max_col = Arc::new(Column::new_path(self.add_stat_reference(Stat::Max)));
                 let replaced_max = self.rewrite_other_exp(Stat::Max);
                 let replaced_min = self.rewrite_other_exp(Stat::Min);
 
@@ -305,7 +299,7 @@ impl<'a> PruningPredicateRewriter<'a> {
                 )))
             }
             Operator::Gt | Operator::Gte => {
-                let max_col = Arc::new(Column::new(self.add_stat_reference(Stat::Max)));
+                let max_col = Arc::new(Column::new_path(self.add_stat_reference(Stat::Max)));
                 let replaced_min = self.rewrite_other_exp(Stat::Min);
 
                 Some(Arc::new(BinaryExpr::new(
@@ -315,7 +309,7 @@ impl<'a> PruningPredicateRewriter<'a> {
                 )))
             }
             Operator::Lt | Operator::Lte => {
-                let min_col = Arc::new(Column::new(self.add_stat_reference(Stat::Min)));
+                let min_col = Arc::new(Column::new_path(self.add_stat_reference(Stat::Min)));
                 let replaced_max = self.rewrite_other_exp(Stat::Max);
 
                 Some(Arc::new(BinaryExpr::new(
@@ -333,15 +327,15 @@ impl<'a> PruningPredicateRewriter<'a> {
 fn replace_column_with_stat(
     expr: &Arc<dyn VortexExpr>,
     stat: Stat,
-    stats_to_fetch: &mut HashMap<Option<Field>, HashSet<Stat>>,
+    stats_to_fetch: &mut HashMap<FieldPath, HashSet<Stat>>,
 ) -> Option<Arc<dyn VortexExpr>> {
     if let Some(col) = expr.as_any().downcast_ref::<Column>() {
-        let new_field = stat_column_name(Some(col.field()), &stat);
+        let new_field = stat_field_path_name(col.field_path(), &stat);
         stats_to_fetch
-            .entry(Some(col.field().clone()))
+            .entry(col.field_path().clone())
             .or_default()
             .insert(stat);
-        return Some(Arc::new(Column::new(new_field)));
+        return Some(Arc::new(Column::new_path(new_field)));
     }
 
     if let Some(not) = expr.as_any().downcast_ref::<Not>() {
@@ -375,6 +369,17 @@ pub(crate) fn stat_column_name_str(field: Option<&Field>, stat: &Stat) -> String
 
 pub(crate) fn stat_column_name(field: Option<&Field>, stat: &Stat) -> Field {
     Field::Name(stat_column_name_str(field, stat))
+}
+
+pub(crate) fn stat_field_path_name(field_path: &FieldPath, stat: &Stat) -> FieldPath {
+    match field_path.path() {
+        [] => FieldPath::from_name(stat.to_string()),
+        path => FieldPath::from_iter(
+            path.iter()
+                .cloned()
+                .chain(iter::once(Field::from(stat.to_string()))),
+        ),
+    }
 }
 
 #[cfg(test)]

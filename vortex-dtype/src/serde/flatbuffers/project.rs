@@ -1,9 +1,62 @@
 use std::sync::Arc;
 
-use vortex_error::{vortex_err, VortexResult};
+use vortex_error::{vortex_bail, vortex_err, VortexResult};
 
 use crate::field::Field;
 use crate::{flatbuffers as fb, DType, StructDType};
+
+fn find_name<'a>(
+    names: flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>,
+    name: &str,
+) -> VortexResult<usize> {
+    names
+        .iter()
+        .position(|n| n == name)
+        .ok_or_else(|| vortex_err!("Unknown field name {name}"))
+}
+
+/// Information about a field in a struct dtype
+pub struct FieldInfo<'a> {
+    /// The position index of the field within the enclosing struct
+    pub index: usize,
+    /// The name of the field
+    pub name: &'a str,
+    /// The dtype of the field
+    pub dtype: fb::DType<'a>,
+}
+
+/// Get information about the referenced field, either by name or index
+/// Returns an error if the field is not found
+pub fn field_info<'a, 'b: 'a>(
+    fb: fb::Struct_<'b>,
+    field: &'a Field,
+) -> VortexResult<FieldInfo<'b>> {
+    let names = fb
+        .names()
+        .ok_or_else(|| vortex_err!("Missing field names"))?;
+    let index = match field {
+        Field::Name(name) => find_name(names, name)?,
+        Field::Index(index) => {
+            if *index
+                >= fb
+                    .names()
+                    .ok_or_else(|| vortex_err!("Missing field names"))?
+                    .len()
+            {
+                vortex_bail!("field index out of bounds: {}", index)
+            }
+            *index
+        }
+    };
+    Ok(FieldInfo {
+        index,
+        name: names.get(index),
+        dtype: fb
+            .dtypes()
+            .ok_or_else(|| vortex_err!("Missing dtypes"))?
+            .get(index),
+    })
+}
 
 /// Convert name references in projection list into index references.
 ///
@@ -14,10 +67,7 @@ pub fn resolve_field<'a, 'b: 'a>(fb: fb::Struct_<'b>, field: &'a Field) -> Vorte
             let names = fb
                 .names()
                 .ok_or_else(|| vortex_err!("Missing field names"))?;
-            names
-                .iter()
-                .position(|name| name == n)
-                .ok_or_else(|| vortex_err!("Unknown field name {n}"))
+            find_name(names, n)
         }
         Field::Index(i) => Ok(*i),
     }

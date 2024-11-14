@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use vortex_dtype::field::Field;
+use vortex_dtype::field::FieldPath;
 use vortex_expr::{BinaryExpr, Column, Identity, Literal, Not, Operator, Select, VortexExpr};
 
 use crate::file::RowFilter;
@@ -8,7 +8,7 @@ use crate::file::RowFilter;
 /// Restrict expression to only the fields that appear in projection
 pub fn expr_project(
     expr: &Arc<dyn VortexExpr>,
-    projection: &[Field],
+    projection: &[FieldPath],
 ) -> Option<Arc<dyn VortexExpr>> {
     if let Some(rf) = expr.as_any().downcast_ref::<RowFilter>() {
         rf.only_fields(projection).map(|rf| Arc::new(rf) as _)
@@ -19,6 +19,7 @@ pub fn expr_project(
             Select::Include(i) => {
                 let fields = i
                     .iter()
+                    // FIXME(DK): this is too simple, need to check if the field is contained by any of the field paths
                     .filter(|f| projection.contains(f))
                     .cloned()
                     .collect::<Vec<_>>();
@@ -42,7 +43,8 @@ pub fn expr_project(
             }
         }
     } else if let Some(c) = expr.as_any().downcast_ref::<Column>() {
-        projection.contains(c.field()).then(|| {
+        // FIXME(DK): again needs to be more complicated
+        projection.contains(c.field_path()).then(|| {
             if projection.len() == 1 {
                 Arc::new(Identity)
             } else {
@@ -53,8 +55,8 @@ pub fn expr_project(
         let own_refs = n.references();
         if own_refs
             .iter()
-            // FIXME(DK): what does projetion mean if there is an identity?
-            .all(|p| p.map(|p| projection.contains(p)).unwrap_or(true))
+            // FIXME(DK): need more complex notion of contains
+            .all(|p| projection.contains(p))
         {
             expr_project(n.child(), projection).map(|proj| Arc::new(Not::new(proj)) as _)
         } else {
@@ -71,14 +73,15 @@ pub fn expr_project(
                     .rhs()
                     .references()
                     .intersection(&bexp.lhs().references())
-                    // FIXME(DK): what does projetion mean if there is an identity?
-                    .any(|f| f.map(|f| projection.contains(f)).unwrap_or(true)))
+                    // FIXME(DK): needs more complex notion of contains
+                    .any(|f| projection.contains(f)))
                 .then_some(lhsp),
                 (None, Some(rhsp)) => (!bexp
                     .lhs()
                     .references()
                     .intersection(&bexp.rhs().references())
-                    .any(|f| f.map(|f| projection.contains(f)).unwrap_or(true)))
+                    // FIXME(DK): need more compelx notion of contains
+                    .any(|f| projection.contains(f)))
                 .then_some(rhsp),
                 (None, None) => None,
             }

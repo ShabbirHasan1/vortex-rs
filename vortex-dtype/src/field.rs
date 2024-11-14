@@ -8,6 +8,8 @@ use std::fmt::{Display, Formatter};
 
 use itertools::Itertools;
 
+use crate::StructDType;
+
 /// A selector for a field in a struct
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -50,17 +52,33 @@ impl Display for Field {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FieldPath(Vec<Field>);
 
-impl FieldPath {
-    /// The selector for the root (i.e., the top-level struct itself)
-    pub fn root() -> Self {
-        Self(vec![])
-    }
+/// The empty or "root" field path.
+pub const EMPTY_FIELD_PATH: FieldPath = FieldPath(vec![]);
 
+/// A reference to the empty or "root" field path.
+pub const EMPTY_FIELD_PATH_REF: &FieldPath = &EMPTY_FIELD_PATH;
+
+impl AsRef<[Field]> for FieldPath {
+    fn as_ref(&self) -> &[Field] {
+        &self.0
+    }
+}
+
+impl FieldPath {
     /// Constructs a new `FieldPath` from a single field selector (i.e., a direct child field of the top-level struct)
     pub fn from_name<F: Into<Field>>(name: F) -> Self {
         Self(vec![name.into()])
     }
 
+    /// An empty/root path..
+    pub fn empty() -> Self {
+        FieldPath(vec![])
+    }
+
+    /// The selector for the root (i.e., the top-level struct itself)
+    pub fn root() -> Self {
+        Self(vec![])
+    }
     /// Returns the sequence of field selectors that make up this path
     pub fn path(&self) -> &[Field] {
         &self.0
@@ -69,6 +87,16 @@ impl FieldPath {
     /// Pushes a new field selector to the end of this path
     pub fn push<F: Into<Field>>(&mut self, field: F) {
         self.0.push(field.into());
+    }
+
+    /// Is this the root/empty path?
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The number of components in this path. The root path has length zero.
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
 }
 
@@ -93,6 +121,60 @@ impl From<Vec<Field>> for FieldPath {
 impl Display for FieldPath {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Display::fmt(&self.0.iter().format("."), f)
+    }
+}
+
+/// FIXME(DK)
+pub struct FieldPathSet {}
+
+impl FieldPathSet {
+    /// FIXME(DK)
+    pub fn contains(&self, _: FieldPath) {
+        todo!()
+    }
+
+    /// FIXME(DK)
+    pub fn difference(&self, _: &FieldPathSet) -> Self {
+        todo!()
+    }
+
+    /// FIXME(DK)
+    pub fn is_empty(&self) -> bool {
+        todo!()
+    }
+
+    /// FIXME(DK)
+    pub fn len(&self) -> usize {
+        todo!()
+    }
+
+    /// FIXME(DK)
+    pub fn to_map(&self) -> FieldPathMap<()> {
+        todo!()
+    }
+}
+
+impl From<&StructDType> for FieldPathSet {
+    fn from(_: &StructDType) -> Self {
+        todo!()
+    }
+}
+
+impl FromIterator<FieldPath> for FieldPathSet {
+    fn from_iter<T: IntoIterator<Item = FieldPath>>(_: T) -> Self {
+        todo!()
+    }
+}
+
+/// FIXME(DK)
+pub struct FieldPathMap<V> {
+    _v: V,
+}
+
+impl<V> FieldPathMap<V> {
+    /// FIXME(DK)
+    pub fn map<W>(&self, _f: impl FnOnce(V) -> W) -> FieldPathMap<W> {
+        todo!()
     }
 }
 

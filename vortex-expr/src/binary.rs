@@ -5,7 +5,7 @@ use std::sync::Arc;
 use vortex_array::aliases::hash_set::HashSet;
 use vortex_array::compute::{and_kleene, compare, or_kleene, Operator as ArrayOperator};
 use vortex_array::Array;
-use vortex_dtype::field::Field;
+use vortex_dtype::field::FieldPath;
 use vortex_error::VortexResult;
 
 use crate::{unbox_any, Operator, VortexExpr};
@@ -62,7 +62,7 @@ impl VortexExpr for BinaryExpr {
         }
     }
 
-    fn collect_references<'a>(&'a self, references: &mut HashSet<Option<&'a Field>>) {
+    fn collect_references<'a>(&'a self, references: &mut HashSet<&'a FieldPath>) {
         self.lhs.collect_references(references);
         self.rhs.collect_references(references);
     }

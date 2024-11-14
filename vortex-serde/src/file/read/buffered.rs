@@ -1,12 +1,11 @@
 use std::collections::VecDeque;
 use std::mem;
-use std::sync::Arc;
 
-use vortex_array::aliases::hash_set::HashSet;
-use vortex_array::array::{ChunkedArray, NullArray, StructArray};
+use vortex_array::array::ChunkedArray;
 use vortex_array::compute::unary::scalar_at;
+use vortex_array::variants::StructArrayTrait;
 use vortex_array::{Array, ArrayDType, IntoArray};
-use vortex_dtype::FieldNames;
+use vortex_dtype::field::FieldPathSet;
 use vortex_error::{vortex_bail, VortexExpect as _, VortexResult};
 use vortex_scalar::BoolScalar;
 
@@ -101,39 +100,38 @@ impl BufferedLayoutReader {
                             .as_struct_array()
                             .vortex_expect("metadata must be struct array");
                         let required_field_names = predicate.required_stat_field_names();
-                        let dtype = metadata.struct_dtype();
-                        let known_names: HashSet<String> =
-                            dtype.names().iter().map(|x| x.to_string()).collect();
-                        let missing_names: Vec<String> = required_field_names
-                            .difference(&known_names)
-                            .cloned()
-                            .collect();
-                        let n_missing = missing_names.len();
-                        let null_filled_field_names: FieldNames = Arc::from(
-                            dtype
-                                .names()
-                                .iter()
-                                .cloned()
-                                .chain(missing_names.iter().cloned().map(Arc::from))
-                                .collect::<Vec<_>>(),
-                        );
-                        let null_filled_metadata = StructArray::try_new(
-                            null_filled_field_names.clone(),
-                            (0..metadata.nfields())
-                                .map(|index| {
-                                    metadata
-                                        .field(index)
-                                        .vortex_expect("array must have as many fields as its type")
-                                })
-                                .chain(
-                                    (0..n_missing)
-                                        .map(|_| NullArray::new(metadata.len()).into_array()),
-                                )
-                                .collect(),
-                            metadata.len(),
-                            logical_validity.into_validity(),
-                        )?
-                        .into_array();
+                        // let dtype = metadata.struct_dtype();
+                        // let known_names = FieldPathSet::from(dtype);
+                        // let missing_fields = required_field_names.difference(&known_names);
+                        // let n_missing = missing_fields.len();
+
+                        let null_filled_metadata = fill_nulls(metadata, required_field_names)?;
+
+                        // let null_filled_field_names: FieldNames = Arc::from(
+                        //     dtype
+                        //         .names()
+                        //         .iter()
+                        //         .cloned()
+                        //         .chain(missing_names.iter().cloned().map(Arc::from))
+                        //         .collect::<Vec<_>>(),
+                        // );
+                        // let null_filled_metadata = StructArray::try_new(
+                        //     null_filled_field_names.clone(),
+                        //     (0..metadata.nfields())
+                        //         .map(|index| {
+                        //             metadata
+                        //                 .field_by_index(index)
+                        //                 .vortex_expect("array must have as many fields as its type")
+                        //         })
+                        //         .chain(
+                        //             (0..n_missing)
+                        //                 .map(|_| NullArray::new(metadata.len()).into_array()),
+                        //         )
+                        //         .collect(),
+                        //     metadata.len(),
+                        //     logical_validity.into_validity(),
+                        // )?
+                        // .into_array();
                         predicate.expr().evaluate(&null_filled_metadata)
                     })
                 })
@@ -239,4 +237,8 @@ impl BufferedLayoutReader {
             }
         }
     }
+}
+
+fn fill_nulls(_array: &dyn StructArrayTrait, _fields: FieldPathSet) -> VortexResult<Array> {
+    todo!()
 }

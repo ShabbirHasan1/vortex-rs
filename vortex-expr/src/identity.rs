@@ -3,7 +3,7 @@ use std::fmt::Display;
 
 use vortex_array::aliases::hash_set::HashSet;
 use vortex_array::Array;
-use vortex_dtype::field::Field;
+use vortex_dtype::field::{FieldPath, EMPTY_FIELD_PATH_REF};
 use vortex_error::VortexResult;
 
 use crate::{unbox_any, VortexExpr};
@@ -26,8 +26,8 @@ impl VortexExpr for Identity {
         Ok(batch.clone())
     }
 
-    fn collect_references<'a>(&'a self, references: &mut HashSet<Option<&'a Field>>) {
-        references.insert(None);
+    fn collect_references<'a>(&'a self, references: &mut HashSet<&'a FieldPath>) {
+        references.insert(EMPTY_FIELD_PATH_REF);
     }
 }
 

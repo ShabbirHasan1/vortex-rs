@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use vortex_array::aliases::hash_set::HashSet;
 use vortex_array::Array;
-use vortex_dtype::field::Field;
+use vortex_dtype::field::FieldPath;
 use vortex_error::{vortex_err, VortexResult};
 
 use crate::{unbox_any, VortexExpr};
@@ -45,7 +45,7 @@ impl VortexExpr for Not {
         })
     }
 
-    fn collect_references<'a>(&'a self, references: &mut HashSet<Option<&'a Field>>) {
+    fn collect_references<'a>(&'a self, references: &mut HashSet<&'a FieldPath>) {
         self.child.collect_references(references)
     }
 }

@@ -6,7 +6,7 @@ use itertools::Itertools;
 use vortex_error::{vortex_bail, vortex_err, vortex_panic, VortexResult};
 use DType::*;
 
-use crate::field::Field;
+use crate::field::{Field, FieldPath};
 use crate::nullability::Nullability;
 use crate::{ExtDType, PType};
 
@@ -253,6 +253,16 @@ impl StructDType {
         }
 
         Ok(StructDType::new(names.into(), dtypes))
+    }
+
+    /// Remove the specified field paths from this struct.
+    pub fn exclude_paths(&self, _exclusion: &[FieldPath]) -> VortexResult<Self> {
+        todo!()
+    }
+
+    /// Return one field path per terminal field in this struct.
+    pub fn to_field_paths(&self) -> VortexResult<Vec<FieldPath>> {
+        todo!()
     }
 }
 
