@@ -28,7 +28,6 @@ use vortex_dtype::DType;
 use vortex_error::{vortex_err, vortex_panic, VortexExpect, VortexResult};
 
 use crate::array::visitor::{AcceptArrayVisitor, ArrayVisitor};
-use crate::compute::unary::scalar_at;
 use crate::compute::ArrayCompute;
 use crate::encoding::{ArrayEncodingRef, EncodingId, EncodingRef};
 use crate::iter::{ArrayIterator, ArrayIteratorAdapter};
@@ -260,17 +259,6 @@ impl Array {
 
         // Now we unwrap the optional, which we know to be populated by the closure.
         result.vortex_expect("Failed to get result from Array::with_dyn")
-    }
-
-    pub fn pretty(&self) -> String {
-        let array = (0..self.len())
-            .map(|index| {
-                scalar_at(self, index)
-                    .vortex_expect("index in 0..len")
-                    .pretty()
-            })
-            .join(" ");
-        format!("({})[{}]", self.dtype(), array)
     }
 }
 

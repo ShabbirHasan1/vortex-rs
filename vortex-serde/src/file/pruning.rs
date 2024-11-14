@@ -12,7 +12,7 @@ use vortex_array::aliases::hash_set::HashSet;
 use vortex_array::stats::Stat;
 use vortex_dtype::field::Field;
 use vortex_dtype::Nullability;
-use vortex_expr::{BinaryExpr, Column, Literal, Not, Operator, VortexExpr};
+use vortex_expr::{BinaryExpr, Column, Identity, Literal, Not, Operator, VortexExpr};
 use vortex_scalar::Scalar;
 
 use super::RowFilter;

@@ -2,7 +2,6 @@ use std::fmt::{Display, Write};
 use std::sync::Arc;
 
 use half::f16;
-use itertools::Itertools as _;
 use vortex_buffer::{Buffer, BufferString};
 use vortex_dtype::DType;
 use vortex_error::{vortex_err, VortexResult};
@@ -141,27 +140,6 @@ impl ScalarValue {
             Self::Null => Ok(None),
             Self::List(l) => Ok(Some(l)),
             _ => Err(vortex_err!("Expected a list scalar, found {:?}", self)),
-        }
-    }
-
-    pub fn pretty(&self, dtype: &DType) -> String {
-        match self {
-            ScalarValue::Bool(b) => if *b { "T" } else { "F" }.to_string(),
-            ScalarValue::Primitive(p) => p.pretty(),
-            ScalarValue::Buffer(buf) => format!("{:x?}", buf),
-            ScalarValue::BufferString(str) => str.to_string(),
-            ScalarValue::List(values) => match dtype {
-                DType::Struct(struct_dtype, ..) => format!(
-                    "{{{}}}",
-                    values
-                        .iter()
-                        .zip(struct_dtype.dtypes().iter())
-                        .map(|(v, t)| v.pretty(t))
-                        .join(", ")
-                ),
-                _ => todo!(),
-            },
-            ScalarValue::Null => "N/A".to_string(),
         }
     }
 }

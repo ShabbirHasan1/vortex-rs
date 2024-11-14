@@ -167,22 +167,6 @@ impl PValue {
     as_primitive!(f16, F16);
     as_primitive!(f32, F32);
     as_primitive!(f64, F64);
-
-    pub fn pretty(&self) -> String {
-        match self {
-            PValue::U8(x) => format!("{}", x),
-            PValue::U16(x) => format!("{}", x),
-            PValue::U32(x) => format!("{}", x),
-            PValue::U64(x) => format!("{}", x),
-            PValue::I8(x) => format!("{}", x),
-            PValue::I16(x) => format!("{}", x),
-            PValue::I32(x) => format!("{}", x),
-            PValue::I64(x) => format!("{}", x),
-            PValue::F16(x) => format!("{}", x),
-            PValue::F32(x) => format!("{}", x),
-            PValue::F64(x) => format!("{}", x),
-        }
-    }
 }
 
 macro_rules! int_pvalue {
