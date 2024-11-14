@@ -30,7 +30,10 @@ impl Display for PruningPredicate {
             "PruningPredicate({}, {{{}}})",
             self.expr,
             self.required_stats.iter().format_with(",", |(k, v), fmt| {
-                fmt(&format_args!("{k}: {{{}}}", v.iter().format(",")))
+                match k {
+                    Some(k) => fmt(&format_args!("{k}: {{{}}}", v.iter().format(","))),
+                    None => fmt(&format_args!("[]: {{{}}}", v.iter().format(","))),
+                }
             })
         )
     }

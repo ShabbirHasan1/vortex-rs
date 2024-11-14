@@ -58,8 +58,6 @@ macro_rules! impl_from_string_like {
     };
 }
 
-impl_from_string_like!(&str);
-impl_from_string_like!(&[u8]);
 impl_from_string_like!(String);
 impl_from_string_like!(BufferString);
 
