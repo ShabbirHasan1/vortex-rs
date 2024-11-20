@@ -1,5 +1,7 @@
 [package]
 name = "bench_object_store"
+description = "benchmark for table scans on object stores"
+publish = false
 version.workspace = true
 homepage.workspace = true
 repository.workspace = true
@@ -14,8 +16,13 @@ categories.workspace = true
 
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
+dotenv = { workspace = true }
+futures = { workspace = true }
+log = { workspace = true }
 object_store = { workspace = true, features = ["aws"] }
-vortex = { workspace = true }
+simplelog = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+vortex = { workspace = true, features = ["object_store"] }
 
 [lints]
 workspace = true
