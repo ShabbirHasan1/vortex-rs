@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "bench-vortex",
+    "bench-vortex", "bench_object_store",
     "encodings/*",
     "fuzz",
     "pyvortex",
