@@ -8,6 +8,7 @@ use bytes::Bytes;
 use futures::future::BoxFuture;
 use futures::Stream;
 use futures_util::{stream, FutureExt, StreamExt, TryStreamExt};
+use tracing::{span, Instrument, Level};
 use vortex_array::array::ChunkedArray;
 use vortex_array::{ArrayData, IntoArrayData};
 use vortex_dtype::DType;
@@ -314,5 +315,6 @@ async fn read_ranges<R: VortexReadAt>(
         })
         .buffered(10)
         .try_collect()
+        .instrument(span!(Level::TRACE, "read_ranges"))
         .await
 }

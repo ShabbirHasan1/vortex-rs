@@ -3,7 +3,7 @@
 use futures::future::BoxFuture;
 use futures::stream::BoxStream;
 use futures::StreamExt;
-use log::trace;
+use tracing::{info, trace};
 use vortex::error::VortexResult;
 use vortex::ArrayData;
 
@@ -41,17 +41,23 @@ impl<S> RunScan<S> {
 impl<S: Scan> RunScan<S> {
     /// Return a set of metrics from doing a full-scan, as well as per-batch metrics.
     pub async fn full_scan(&self) {
-        self.inner
-            .open(self.path.as_str())
-            .await
-            .for_each(|batch| async move {
+        info!("begin open for {}", self.path.as_str());
+        let scanner = self.inner.open(self.path.as_str()).await;
+        info!("scanner opened, begin scanning batches");
+        let total_nbytes: usize = scanner
+            .map(|batch| async move {
                 let batch = batch.unwrap();
+                let batch_nbytes = batch.nbytes();
                 trace!(
                     "received batch with len = {} size = {}B",
                     batch.len(),
-                    batch.nbytes()
+                    batch_nbytes,
                 );
+
+                batch_nbytes
             })
+            .fold(0, |acc, x| async move { acc + x.await })
             .await;
+        info!("scanning complete, read  {total_nbytes} bytes");
     }
 }

@@ -22,6 +22,8 @@ log = { workspace = true }
 object_store = { workspace = true, features = ["aws"] }
 simplelog = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 vortex = { workspace = true, features = ["object_store"] }
 
 [lints]

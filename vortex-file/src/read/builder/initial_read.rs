@@ -2,6 +2,7 @@ use core::ops::Range;
 
 use bytes::Bytes;
 use flatbuffers::{root, root_unchecked};
+use log::trace;
 use vortex_error::{vortex_bail, vortex_err, VortexResult};
 use vortex_flatbuffers::{footer, message};
 use vortex_io::VortexReadAt;
@@ -93,6 +94,11 @@ pub async fn read_initial_bytes<R: VortexReadAt>(
     let read_size = INITIAL_READ_SIZE.min(file_size as usize);
 
     let initial_read_offset = file_size - read_size as u64;
+    trace!(
+        "dispatching initial_read @ offset={} size={}",
+        initial_read_offset,
+        read_size
+    );
     let buf = read
         .read_byte_range(initial_read_offset, read_size as u64)
         .await?;

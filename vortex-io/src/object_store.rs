@@ -4,8 +4,10 @@ use std::sync::Arc;
 use std::{io, mem};
 
 use bytes::Bytes;
+use log::trace;
 use object_store::path::Path;
 use object_store::{ObjectStore, WriteMultipart};
+use tracing::{info_span, instrument, Instrument};
 use vortex_buffer::io_buf::IoBuf;
 use vortex_buffer::Buffer;
 use vortex_error::{vortex_panic, VortexError, VortexResult};
@@ -70,6 +72,7 @@ impl VortexReadAt for ObjectStoreReadAt {
         pos: u64,
         len: u64,
     ) -> impl Future<Output = io::Result<Bytes>> + 'static {
+        trace!("ObjectStoreReadAt::read_byte_range");
         let object_store = self.object_store.clone();
         let location = self.location.clone();
 
@@ -77,11 +80,13 @@ impl VortexReadAt for ObjectStoreReadAt {
             let start_range = pos as usize;
             let bytes = object_store
                 .get_range(&location, start_range..(start_range + len as usize))
+                .instrument(info_span!("read_byte_range", pos = pos, len = len))
                 .await?;
             Ok(bytes)
         })
     }
 
+    #[instrument(skip(self))]
     fn size(&self) -> impl Future<Output = u64> + 'static {
         let object_store = self.object_store.clone();
         let location = self.location.clone();

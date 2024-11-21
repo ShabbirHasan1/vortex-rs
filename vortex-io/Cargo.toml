@@ -21,8 +21,10 @@ futures = { workspace = true, features = ["std"] }
 futures-util = { workspace = true }
 flume = { workspace = true }
 object_store = { workspace = true, optional = true }
+tracing = { workspace = true }
 vortex-buffer = { workspace = true }
 vortex-error = { workspace = true }
+log = "0.4.22"
 
 [dev-dependencies]
 tempfile = { workspace = true }

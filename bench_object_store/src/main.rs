@@ -1,13 +1,13 @@
 #![allow(clippy::unwrap_used, clippy::disallowed_types)]
 use std::collections::HashMap;
 use std::str::FromStr;
-
+use std::time::Duration;
 use bench_object_store::s3::S3Scan;
 use bench_object_store::{RunScan, Scan};
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use log::{debug, info, trace, LevelFilter};
 use object_store::aws::AmazonS3ConfigKey;
-use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
+use tracing::{debug, info, info_span, trace, Instrument, Level};
+use tracing_subscriber::fmt::format::FmtSpan;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -84,18 +84,17 @@ async fn main() {
 
     // Configure logging.
     let level = match cli.verbose {
-        0 => LevelFilter::Info,
-        1 => LevelFilter::Debug,
-        _ => LevelFilter::Trace,
+        0 => Level::INFO,
+        1 => Level::DEBUG,
+        _ => Level::TRACE,
     };
 
-    TermLogger::init(
-        level,
-        Config::default(),
-        TerminalMode::Stderr,
-        ColorChoice::Auto,
-    )
-    .unwrap();
+    tracing_subscriber::fmt()
+        .with_max_level(level)
+        .with_span_events(FmtSpan::CLOSE)
+        .init();
+
+    tokio::time::sleep(Duration::from_secs(1)).instrument(info_span!("start_sleep")).await;
 
     // Find and load an available .env file
     if let Ok(path_buf) = dotenv::dotenv() {
