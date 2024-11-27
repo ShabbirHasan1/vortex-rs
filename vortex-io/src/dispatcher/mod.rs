@@ -5,7 +5,7 @@ mod tokio;
 use std::future::Future;
 
 use futures::channel::oneshot;
-use vortex_error::VortexResult;
+use vortex_error::{vortex_panic, VortexResult};
 
 #[cfg(feature = "compio")]
 use self::compio::*;
@@ -73,7 +73,7 @@ impl Default for IoDispatcher {
         #[cfg(all(feature = "compio", not(feature = "tokio")))]
         return Self(Inner::Compio(CompioDispatcher::new(1)));
         #[cfg(not(any(feature = "compio", feature = "tokio")))]
-        return Self(Inner {});
+        vortex_panic!("must enable at least one I/O crate")
     }
 }
 
