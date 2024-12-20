@@ -173,21 +173,21 @@ impl Objective {
 #[derive(Debug, Clone)]
 pub struct CompressConfig {
     /// Size of each sample slice
-    sample_size: u16,
+    pub sample_size: u16,
     /// Number of sample slices
-    sample_count: u16,
+    pub sample_count: u16,
     /// Random number generator seed
-    rng_seed: u64,
+    pub rng_seed: u64,
 
     // Maximum depth of compression tree
-    max_cost: u8,
+    pub max_cost: u8,
     // Are we minimizing size or maximizing performance?
-    objective: Objective,
+    pub objective: Objective,
 
     // Target chunk size in bytes
-    target_block_bytesize: usize,
+    pub target_block_bytesize: usize,
     // Target chunk size in row count
-    target_block_size: usize,
+    pub target_block_size: usize,
 }
 
 impl Default for CompressConfig {
