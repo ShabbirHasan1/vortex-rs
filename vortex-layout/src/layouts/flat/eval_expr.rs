@@ -10,10 +10,10 @@ use vortex_flatbuffers::{array as fba, FlatBuffer};
 use vortex_scan::RowMask;
 
 use crate::layouts::flat::reader::FlatReader;
-use crate::reader::LayoutScanExt;
+use crate::reader::LayoutReaderExt;
 use crate::{ExprEvaluator, LayoutReader};
 
-#[async_trait(?Send)]
+#[async_trait]
 impl ExprEvaluator for FlatReader {
     async fn evaluate_expr(
         self: &Self,
