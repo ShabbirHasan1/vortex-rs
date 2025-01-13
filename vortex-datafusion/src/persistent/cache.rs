@@ -5,13 +5,13 @@ use moka::future::Cache;
 use object_store::path::Path;
 use object_store::{ObjectMeta, ObjectStore};
 use vortex_array::ContextRef;
-use vortex_error::{vortex_err, VortexError, VortexResult};
+use vortex_error::VortexResult;
 use vortex_file::v2::{FileLayout, VortexOpenOptions};
 use vortex_io::ObjectStoreReadAt;
 
 #[derive(Debug, Clone)]
 pub struct FileLayoutCache {
-    inner: Cache<Key, FileLayout>,
+    _inner: Cache<Key, FileLayout>,
 }
 
 #[derive(Hash, Eq, PartialEq, Debug)]
@@ -38,7 +38,7 @@ impl FileLayoutCache {
             })
             .build();
 
-        Self { inner }
+        Self { _inner: inner }
     }
 
     pub async fn try_get(
@@ -46,19 +46,26 @@ impl FileLayoutCache {
         object: &ObjectMeta,
         store: Arc<dyn ObjectStore>,
     ) -> VortexResult<FileLayout> {
-        self.inner
-            .try_get_with(Key::from(object), async {
-                let os_read_at = ObjectStoreReadAt::new(store.clone(), object.location.clone());
-                let vxf = VortexOpenOptions::new(ContextRef::default())
-                    .with_file_size(object.size as u64)
-                    .open(os_read_at)
-                    .await?;
-                VortexResult::Ok(vxf.file_layout().clone())
-            })
-            .await
-            .map_err(|e: Arc<VortexError>| match Arc::try_unwrap(e) {
-                Ok(e) => e,
-                Err(e) => vortex_err!("{}", e.to_string()),
-            })
+        let os_read_at = ObjectStoreReadAt::new(store.clone(), object.location.clone());
+        let vxf = VortexOpenOptions::new(ContextRef::default())
+            .with_file_size(object.size as u64)
+            .open(os_read_at)
+            .await?;
+        VortexResult::Ok(vxf.file_layout().clone())
+
+        // self.inner
+        //     .try_get_with(Key::from(object), async {
+        //         let os_read_at = ObjectStoreReadAt::new(store.clone(), object.location.clone());
+        //         let vxf = VortexOpenOptions::new(ContextRef::default())
+        //             .with_file_size(object.size as u64)
+        //             .open(os_read_at)
+        //             .await?;
+        //         VortexResult::Ok(vxf.file_layout().clone())
+        //     })
+        //     .await
+        //     .map_err(|e: Arc<VortexError>| match Arc::try_unwrap(e) {
+        //         Ok(e) => e,
+        //         Err(e) => vortex_err!("{}", e.to_string()),
+        //     })
     }
 }
