@@ -120,7 +120,7 @@ impl FillForwardFn<ByteBoolArray> for ByteBoolEncoding {
 
         let filled = bools
             .iter()
-            .zip(validity.inner().iter())
+            .zip(validity.iter())
             .map(|(&v, is_valid)| {
                 if is_valid {
                     last_value = v

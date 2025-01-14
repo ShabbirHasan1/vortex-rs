@@ -36,9 +36,12 @@ use crate::compressors::zigzag::ZigZagCompressor;
 pub mod arbitrary;
 pub mod compressors;
 mod constants;
+mod dict;
 mod downscale;
+mod iter;
 mod sampling;
 mod sampling_compressor;
+mod streaming;
 
 pub use sampling_compressor::*;
 
