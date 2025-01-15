@@ -12,10 +12,10 @@ use crate::v2::segments::SegmentRequest;
 ///
 /// I/O drivers are able to coalesce, debounce, or otherwise group the requests, as well as control the concurrency
 /// of the I/O operations with [`futures::stream::buffered`].
-pub trait IoDriver: 'static {
+pub trait IoDriver {
     // NOTE(ngates): this isn't an async_trait since it doesn't need to be object-safe or boxed.
     fn drive(
-        &self,
+        self,
         stream: impl Stream<Item = SegmentRequest> + 'static,
     ) -> impl Stream<Item = VortexResult<()>> + 'static;
 }
