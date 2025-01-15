@@ -132,11 +132,13 @@ impl FileFormat for VortexFormat {
         let read = ObjectStoreReadAt::new(store.clone(), object.location.clone());
 
         // This stream should be inferred to be Send based on ObjectStoreReadAt.
-        let vxf = VortexOpenOptions::new(self.context.clone())
+        let _chunks: Vec<ArrayData> = VortexOpenOptions::new(self.context.clone())
             .with_file_layout(file_layout)
             .open(read)
+            .await?
+            .scan(Scan::all())?
+            .try_collect()
             .await?;
-        let _chunks: Vec<ArrayData> = vxf.scan(Scan::all())?.try_collect().await?;
 
         // TODO(ngates): we should decide if it's worth returning file statistics. Since this
         //  call doesn't have projection information, I think it's better to wait until we can
