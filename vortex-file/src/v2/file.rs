@@ -70,9 +70,10 @@ impl<I: IoDriver> VortexFile<I> {
     }
 
     /// Performs a scan operation over the file.
-    pub fn scan(&self, scan: Scan) -> VortexResult<impl ArrayStream + 'static + use<'_, I>> {
+    pub fn scan(self, scan: Scan) -> VortexResult<impl ArrayStream + 'static + use<I>> {
+        let splits = self.splits.clone();
         self.scan_with_masks(
-            ArcIter::new(self.splits.clone())
+            ArcIter::new(splits)
                 .map(|row_range| RowMask::new_valid_between(row_range.start, row_range.end)),
             scan,
         )
@@ -81,10 +82,10 @@ impl<I: IoDriver> VortexFile<I> {
     /// Takes the given rows while also applying the filter and projection functions from a scan.
     /// The row indices must be sorted.
     pub fn take(
-        &self,
+        self,
         row_indices: Buffer<u64>,
         scan: Scan,
-    ) -> VortexResult<impl ArrayStream + 'static + use<'_, I>> {
+    ) -> VortexResult<impl ArrayStream + 'static + use<I>> {
         if !row_indices.windows(2).all(|w| w[0] <= w[1]) {
             vortex_bail!("row indices must be sorted")
         }
@@ -130,10 +131,10 @@ impl<I: IoDriver> VortexFile<I> {
     }
 
     fn scan_with_masks<R>(
-        &self,
+        self,
         row_masks: R,
         scan: Scan,
-    ) -> VortexResult<impl ArrayStream + 'static + use<'_, I, R>>
+    ) -> VortexResult<impl ArrayStream + 'static + use<I, R>>
     where
         R: Iterator<Item = RowMask> + Send + 'static,
     {

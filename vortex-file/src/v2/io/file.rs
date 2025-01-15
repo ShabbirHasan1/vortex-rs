@@ -70,7 +70,7 @@ struct CoalescedSegmentRequest {
 
 impl<R: VortexReadAt> IoDriver for FileIoDriver<R> {
     fn drive(
-        &self,
+        self,
         stream: impl Stream<Item = SegmentRequest> + 'static,
     ) -> impl Stream<Item = VortexResult<()>> + 'static {
         // We map the segment requests to their respective locations within the file.
