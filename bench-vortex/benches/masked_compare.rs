@@ -100,3 +100,30 @@ fn clone_and_compare_bool(bencher: Bencher) {
     // let mask = FilterMask::from_buffer(mask);
     bencher.bench_local(move || data.clone());
 }
+
+#[divan::bench(args = [0.001, 0.01, 0.1, 0.5, 0.8])]
+fn filter_only(bencher: Bencher, fraction_kept: f64) {
+    let mut rng = StdRng::seed_from_u64(0);
+    let data = (0..10000)
+        .map(|_| rng.gen_range(0..100))
+        .collect::<Vec<_>>();
+    let mask = (0..10000)
+        .map(|_| rng.gen_bool(fraction_kept))
+        .collect::<BooleanBuffer>();
+    let mask = FilterMask::from_buffer(mask);
+    bencher.bench_local(move || {
+        mask.indices()
+            .iter()
+            .map(|kept_index| data[*kept_index])
+            .collect::<Vec<_>>()
+    });
+}
+
+#[divan::bench()]
+fn compare_only(bencher: Bencher) {
+    let mut rng = StdRng::seed_from_u64(0);
+    let data = (0..10000)
+        .map(|_| rng.gen_range(0..100))
+        .collect::<Vec<_>>();
+    bencher.bench_local(move || data.iter().map(|value| *value < 0).collect::<Vec<_>>());
+}

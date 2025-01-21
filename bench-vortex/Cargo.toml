@@ -103,3 +103,8 @@ harness = false
 name = "clickbench"
 test = false
 harness = false
+
+[[bench]]
+name = "masked_compare"
+test = false
+harness = false
