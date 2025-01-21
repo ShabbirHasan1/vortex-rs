@@ -1,6 +1,6 @@
 use arrow_array::BooleanArray;
 use vortex_error::{vortex_bail, VortexError, VortexExpect, VortexResult};
-use vortex_mask::Mask;
+use vortex_mask::{Mask, MaskIter};
 
 use crate::array::ConstantArray;
 use crate::arrow::FromArrowArray;
@@ -9,6 +9,7 @@ use crate::encoding::Encoding;
 use crate::{ArrayDType, ArrayData, Canonical, IntoArrayData, IntoCanonical};
 
 pub type FilterMask = Mask;
+pub type FilterIter<'a> = MaskIter<'a>;
 
 pub trait FilterFn<Array> {
     /// Filter an array by the provided predicate.
