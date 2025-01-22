@@ -15,7 +15,7 @@ use crate::array::{
     BoolEncoding, ChunkedArray, ExtensionEncoding, NullEncoding, PrimitiveEncoding, StructEncoding,
     VarBinEncoding, VarBinViewEncoding,
 };
-use crate::compute::scalar_at;
+use crate::compute::{scalar_at, FilterMask};
 use crate::encoding::{Encoding, EncodingId, EncodingRef, EncodingVTable};
 use crate::iter::{ArrayIterator, ArrayIteratorAdapter};
 use crate::stats::{ArrayStatistics, Stat, Statistics, StatsSet};
@@ -60,7 +60,7 @@ impl ArrayData {
     pub fn try_new_owned(
         encoding: EncodingRef,
         dtype: DType,
-        len: usize,
+        mask: FilterMask,
         metadata: Arc<dyn ArrayMetadata>,
         buffers: Option<Box<[ByteBuffer]>>,
         children: Option<Box<[ArrayData]>>,
@@ -69,7 +69,7 @@ impl ArrayData {
         Self::try_new(InnerArrayData::Owned(Arc::new(OwnedArrayData {
             encoding,
             dtype,
-            len,
+            mask,
             metadata,
             buffers,
             children,
@@ -107,7 +107,7 @@ impl ArrayData {
         let view = ViewedArrayData {
             encoding,
             dtype,
-            len,
+            mask: FilterMask::new_true(len),
             metadata,
             flatbuffer,
             flatbuffer_loc,
@@ -149,6 +149,21 @@ impl ArrayData {
         Ok(array)
     }
 
+    pub fn with_selection(&mut self, mask: FilterMask) -> VortexResult<()> {
+        match &mut self.0 {
+            InnerArrayData::Owned(d) => self.0 = d.with_selection(mask),
+            InnerArrayData::Viewed(v) => v.with_selection(mask),
+        }
+        Ok(())
+    }
+
+    pub fn mask(&self) -> &FilterMask {
+        match &self.0 {
+            InnerArrayData::Owned(d) => &d.mask,
+            InnerArrayData::Viewed(v) => &v.mask,
+        }
+    }
+
     /// Return the array's encoding
     pub fn encoding(&self) -> EncodingRef {
         match &self.0 {
@@ -161,8 +176,8 @@ impl ArrayData {
     #[allow(clippy::same_name_method)]
     pub fn len(&self) -> usize {
         match &self.0 {
-            InnerArrayData::Owned(d) => d.len,
-            InnerArrayData::Viewed(v) => v.len,
+            InnerArrayData::Owned(d) => d.mask.len(),
+            InnerArrayData::Viewed(v) => v.mask.len(),
         }
     }
 
@@ -205,11 +220,16 @@ impl ArrayData {
             .then(|| scalar_at(self, 0).vortex_expect("expected a scalar value"))
     }
 
-    pub fn child<'a>(&'a self, idx: usize, dtype: &'a DType, len: usize) -> VortexResult<Self> {
+    pub fn child<'a>(
+        &'a self,
+        idx: usize,
+        dtype: &'a DType,
+        filter_mask: &FilterMask,
+    ) -> VortexResult<Self> {
         match &self.0 {
-            InnerArrayData::Owned(d) => d.child(idx, dtype, len).cloned(),
+            InnerArrayData::Owned(d) => d.child(idx, dtype, filter_mask),
             InnerArrayData::Viewed(v) => v
-                .child(idx, dtype, len)
+                .child(idx, dtype, filter_mask)
                 .map(|view| ArrayData(InnerArrayData::Viewed(view))),
         }
     }

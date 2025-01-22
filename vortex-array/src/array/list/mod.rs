@@ -17,7 +17,7 @@ use vortex_scalar::Scalar;
 use crate::array::PrimitiveArray;
 #[cfg(feature = "test-harness")]
 use crate::builders::{ArrayBuilder, ListBuilder};
-use crate::compute::{scalar_at, slice};
+use crate::compute::{scalar_at, slice, FilterMask};
 use crate::encoding::ids;
 use crate::stats::{StatisticsVTable, StatsSet};
 use crate::validate::ValidateVTable;
@@ -83,7 +83,10 @@ impl ListArray {
 
         Self::try_from_parts(
             list_dtype,
-            list_len,
+            // TODO(joe): is this okay?
+            // Store a filter mask of the offsets buffers, and remove to slice to (1..)
+            // when given it escapes the array
+            FilterMask::new_true(list_len + 1),
             ListMetadata {
                 validity: validity_metadata,
                 elements_len: element_len,
@@ -98,7 +101,7 @@ impl ListArray {
     pub fn validity(&self) -> Validity {
         self.metadata().validity.to_validity(|| {
             self.as_ref()
-                .child(2, &Validity::DTYPE, self.len())
+                .child(2, &Validity::DTYPE, &self.0.mask().skip(1))
                 .vortex_expect("ListArray: validity child")
         })
     }
@@ -138,7 +141,7 @@ impl ListArray {
     pub fn offsets(&self) -> ArrayData {
         // TODO: find cheap transform
         self.as_ref()
-            .child(1, &self.metadata().offset_ptype.into(), self.len() + 1)
+            .child(1, &self.metadata().offset_ptype.into(), self.0.mask())
             .vortex_expect("array contains offsets")
     }
 
@@ -149,7 +152,12 @@ impl ListArray {
             .as_list_element()
             .vortex_expect("must be list dtype");
         self.as_ref()
-            .child(0, dtype, self.metadata().elements_len)
+            // TODO(joe): this ignores validity
+            .child(
+                0,
+                dtype,
+                &FilterMask::new_true(self.metadata().elements_len),
+            )
             .vortex_expect("array contains elements")
     }
 }

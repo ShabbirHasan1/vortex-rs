@@ -12,7 +12,7 @@ use vortex_scalar::Scalar;
 
 use crate::array::primitive::PrimitiveArray;
 use crate::array::varbin::builder::VarBinBuilder;
-use crate::compute::scalar_at;
+use crate::compute::{scalar_at, FilterMask};
 use crate::encoding::ids;
 use crate::stats::StatsSet;
 use crate::validate::ValidateVTable;
@@ -82,7 +82,8 @@ impl VarBinArray {
 
         Self::try_from_parts(
             dtype,
-            length,
+            // Store a filter mask of the offsets slice to get a length filter mask
+            FilterMask::new_true(length + 1),
             metadata,
             Some([bytes].into()),
             Some(children.into()),
@@ -96,7 +97,7 @@ impl VarBinArray {
             .child(
                 0,
                 &DType::Primitive(self.metadata().offsets_ptype, Nullability::NonNullable),
-                self.len() + 1,
+                self.0.mask(),
             )
             .vortex_expect("Missing offsets in VarBinArray")
     }
@@ -104,7 +105,7 @@ impl VarBinArray {
     pub fn validity(&self) -> Validity {
         self.metadata().validity.to_validity(|| {
             self.as_ref()
-                .child(1, &Validity::DTYPE, self.len())
+                .child(1, &Validity::DTYPE, &self.0.mask().take(1))
                 .vortex_expect("VarBinArray: validity child")
         })
     }

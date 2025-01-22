@@ -11,7 +11,7 @@ use vortex_dtype::{DType, Nullability, PType};
 use vortex_error::{vortex_bail, vortex_panic, VortexExpect as _, VortexResult, VortexUnwrap};
 
 use crate::array::primitive::PrimitiveArray;
-use crate::compute::{scalar_at, search_sorted_usize, SearchSortedSide};
+use crate::compute::{scalar_at, search_sorted_usize, FilterMask, SearchSortedSide};
 use crate::encoding::ids;
 use crate::iter::{ArrayIterator, ArrayIteratorAdapter};
 use crate::stats::StatsSet;
@@ -70,9 +70,11 @@ impl ChunkedArray {
         children.push(PrimitiveArray::new(chunk_offsets, NonNullable).into_array());
         children.extend(chunks);
 
+        let mask = FilterMask::new_true(length.try_into().vortex_unwrap());
+
         Self::try_from_parts(
             dtype,
-            length.try_into().vortex_unwrap(),
+            mask,
             ChunkedMetadata { nchunks },
             None,
             Some(children.into()),
@@ -91,8 +93,11 @@ impl ChunkedArray {
         let chunk_end = usize::try_from(&scalar_at(&chunk_offsets, idx + 1)?)?;
 
         // Offset the index since chunk_ends is child 0.
-        self.as_ref()
-            .child(idx + 1, self.as_ref().dtype(), chunk_end - chunk_start)
+        self.as_ref().child(
+            idx + 1,
+            self.as_ref().dtype(),
+            &self.0.mask().slice(chunk_start, chunk_end - chunk_start),
+        )
     }
 
     pub fn nchunks(&self) -> usize {
@@ -102,7 +107,12 @@ impl ChunkedArray {
     #[inline]
     pub fn chunk_offsets(&self) -> ArrayData {
         self.as_ref()
-            .child(0, &Self::ENDS_DTYPE, self.nchunks() + 1)
+            .child(
+                0,
+                &Self::ENDS_DTYPE,
+                // TODO: stop allocating each time.
+                &FilterMask::new_true(self.nchunks() + 1),
+            )
             .vortex_expect("Missing chunk ends in ChunkedArray")
     }
 

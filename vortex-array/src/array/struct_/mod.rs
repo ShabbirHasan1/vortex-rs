@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use vortex_dtype::{DType, Field, FieldName, FieldNames, StructDType};
 use vortex_error::{vortex_bail, vortex_err, vortex_panic, VortexExpect as _, VortexResult};
 
+use crate::compute::FilterMask;
 use crate::encoding::ids;
 use crate::stats::{ArrayStatistics, Stat, StatisticsVTable, StatsSet};
 use crate::validate::ValidateVTable;
@@ -33,7 +34,7 @@ impl StructArray {
     pub fn validity(&self) -> Validity {
         self.metadata().validity.to_validity(|| {
             self.as_ref()
-                .child(self.nfields(), &Validity::DTYPE, self.len())
+                .child(self.nfields(), &Validity::DTYPE, self.0.mask())
                 .vortex_expect("StructArray: validity child")
         })
     }
@@ -79,7 +80,7 @@ impl StructArray {
 
         Self::try_from_parts(
             DType::Struct(StructDType::new(names, field_dtypes), nullability),
-            length,
+            FilterMask::new_true(length),
             StructMetadata {
                 validity: validity_metadata,
             },
@@ -160,7 +161,8 @@ impl StructArrayTrait for StructArray {
                                 .dtype
                                 .value()
                                 .vortex_expect("FieldInfo could not access dtype"),
-                            self.len(),
+                            // TODO(joe): merge this with the inner selection (if that is allowed)
+                            self.0.mask(),
                         )
                         .unwrap_or_else(|e| {
                             vortex_panic!(e, "StructArray: field {} not found", idx)

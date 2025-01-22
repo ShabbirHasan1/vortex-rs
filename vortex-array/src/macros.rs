@@ -44,7 +44,7 @@ macro_rules! impl_encoding {
                 #[allow(dead_code)]
                 fn try_from_parts(
                     dtype: vortex_dtype::DType,
-                    len: usize,
+                    mask: $crate::compute::FilterMask,
                     metadata: [<$Name Metadata>],
                     buffers: Option<Box<[vortex_buffer::ByteBuffer]>>,
                     children: Option<Box<[$crate::ArrayData]>>,
@@ -53,7 +53,7 @@ macro_rules! impl_encoding {
                     Self::try_from($crate::ArrayData::try_new_owned(
                             &[<$Name Encoding>],
                             dtype,
-                            len,
+                            mask,
                             std::sync::Arc::new(metadata),
                             buffers,
                             children,

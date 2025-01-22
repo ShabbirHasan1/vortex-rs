@@ -7,6 +7,7 @@ use vortex_dtype::DType;
 use vortex_error::{vortex_err, VortexResult};
 use vortex_flatbuffers::FlatBuffer;
 
+use crate::compute::FilterMask;
 use crate::encoding::opaque::OpaqueEncoding;
 use crate::encoding::EncodingRef;
 use crate::{flatbuffers as fb, ArrayMetadata, ContextRef};
@@ -16,7 +17,8 @@ use crate::{flatbuffers as fb, ArrayMetadata, ContextRef};
 pub(super) struct ViewedArrayData {
     pub(super) encoding: EncodingRef,
     pub(super) dtype: DType,
-    pub(super) len: usize,
+    /// See `OwnedArrayData::mask`.
+    pub(super) mask: FilterMask,
     pub(super) metadata: Arc<dyn ArrayMetadata>,
     pub(super) flatbuffer: FlatBuffer,
     pub(super) flatbuffer_loc: usize,
@@ -46,8 +48,14 @@ impl ViewedArrayData {
         self.flatbuffer().metadata().map(|m| m.bytes())
     }
 
+    // See `OwnedArrayData::with_selection`.
+    pub fn with_selection(&mut self, mask: FilterMask) {
+        assert_eq!(self.mask.len(), mask.len());
+        self.mask = mask;
+    }
+
     // TODO(ngates): should we separate self and DType lifetimes? Should DType be cloned?
-    pub fn child(&self, idx: usize, dtype: &DType, len: usize) -> VortexResult<Self> {
+    pub fn child(&self, idx: usize, dtype: &DType, mask: &FilterMask) -> VortexResult<Self> {
         let child = self
             .array_child(idx)
             .ok_or_else(|| vortex_err!("ArrayView: array_child({idx}) not found"))?;
@@ -69,7 +77,9 @@ impl ViewedArrayData {
         Ok(Self {
             encoding,
             dtype: dtype.clone(),
-            len,
+            // Intersect the parent mask with the child mask.
+            // TODO(joe): consider if one of the masks must be all true (for now).
+            mask: self.mask.intersect_by_rank(&mask),
             metadata,
             flatbuffer: self.flatbuffer.clone(),
             flatbuffer_loc,

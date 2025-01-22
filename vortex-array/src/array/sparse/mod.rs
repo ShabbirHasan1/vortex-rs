@@ -5,7 +5,7 @@ use vortex_error::{vortex_bail, vortex_panic, VortexExpect as _, VortexResult};
 use vortex_scalar::{Scalar, ScalarValue};
 
 use crate::array::constant::ConstantArray;
-use crate::compute::{scalar_at, sub_scalar};
+use crate::compute::{scalar_at, sub_scalar, FilterMask};
 use crate::encoding::ids;
 use crate::patches::{Patches, PatchesMetadata};
 use crate::stats::{ArrayStatistics, Stat, StatisticsVTable, StatsSet};
@@ -90,7 +90,7 @@ impl SparseArray {
 
         Self::try_from_parts(
             patches.dtype().clone(),
-            len,
+            FilterMask::new_true(len),
             SparseMetadata {
                 indices_offset,
                 patches: patches_metadata,
@@ -114,12 +114,18 @@ impl SparseArray {
             .child(
                 0,
                 &self.metadata().patches.indices_dtype(),
-                self.metadata().patches.len(),
+                // TODO how to handle this?
+                &FilterMask::new_true(self.metadata().patches.len()),
+                // self.metadata().patches.len(),
             )
             .vortex_expect("Missing indices array in SparseArray");
         let values = self
             .as_ref()
-            .child(1, self.dtype(), self.metadata().patches.len())
+            .child(
+                1,
+                self.dtype(),
+                &FilterMask::new_true(self.metadata().patches.len()),
+            )
             .vortex_expect("Missing values array in SparseArray");
         Patches::new(self.len(), indices, values)
     }

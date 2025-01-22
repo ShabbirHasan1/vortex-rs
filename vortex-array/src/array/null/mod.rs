@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use vortex_dtype::DType;
 use vortex_error::{VortexExpect as _, VortexResult};
 
+use crate::compute::FilterMask;
 use crate::encoding::ids;
 use crate::nbytes::ArrayNBytes;
 use crate::stats::{Stat, StatisticsVTable, StatsSet};
@@ -30,7 +31,7 @@ impl NullArray {
     pub fn new(len: usize) -> Self {
         Self::try_from_parts(
             DType::Null,
-            len,
+            FilterMask::new_true(len),
             NullMetadata,
             None,
             None,

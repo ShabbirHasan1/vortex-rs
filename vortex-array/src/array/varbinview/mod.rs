@@ -16,6 +16,7 @@ use vortex_error::{
 };
 
 use crate::arrow::FromArrowArray;
+use crate::compute::FilterMask;
 use crate::encoding::ids;
 use crate::stats::StatsSet;
 use crate::validate::ValidateVTable;
@@ -244,7 +245,7 @@ impl VarBinViewArray {
 
         Self::try_from_parts(
             dtype,
-            array_len,
+            FilterMask::new_true(array_len),
             metadata,
             Some(array_buffers.into()),
             validity.into_array().map(|v| [v].into()),
@@ -325,7 +326,7 @@ impl VarBinViewArray {
     pub fn validity(&self) -> Validity {
         self.metadata().validity.to_validity(|| {
             self.0
-                .child(0, &Validity::DTYPE, self.len())
+                .child(0, &Validity::DTYPE, self.0.mask())
                 .vortex_expect("VarBinViewArray: validity child")
         })
     }

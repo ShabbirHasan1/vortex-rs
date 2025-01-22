@@ -22,6 +22,8 @@ mod stats;
 // Re-export the BooleanBuffer type on our API surface.
 pub use arrow_buffer::BooleanBuffer;
 
+use crate::compute::FilterMask;
+
 impl_encoding!("vortex.bool", ids::BOOL, Bool);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -90,7 +92,7 @@ impl BoolArray {
     pub fn validity(&self) -> Validity {
         self.metadata().validity.to_validity(|| {
             self.as_ref()
-                .child(0, &Validity::DTYPE, self.len())
+                .child(0, &Validity::DTYPE, self.0.mask())
                 .vortex_expect("BoolArray: validity child")
         })
     }
@@ -108,20 +110,19 @@ impl BoolArray {
     /// Returns an error if the validity length does not match the buffer length.
     #[allow(clippy::cast_possible_truncation)]
     pub fn try_new(buffer: BooleanBuffer, validity: Validity) -> VortexResult<Self> {
-        let buffer_len = buffer.len();
+        let arr_len = buffer.len();
+        let mask = FilterMask::new_true(buffer.len());
         let buffer_offset = buffer.offset();
         let first_byte_bit_offset = (buffer_offset % 8) as u8;
         let buffer_byte_offset = buffer_offset - (first_byte_bit_offset as usize);
 
-        let inner = buffer
-            .into_inner()
-            .bit_slice(buffer_byte_offset, buffer_len);
+        let inner = buffer.into_inner().bit_slice(buffer_byte_offset, arr_len);
 
         Self::try_from_parts(
             DType::Bool(validity.nullability()),
-            buffer_len,
+            mask,
             BoolMetadata {
-                validity: validity.to_metadata(buffer_len)?,
+                validity: validity.to_metadata(arr_len)?,
                 first_byte_bit_offset,
             },
             Some(vec![ByteBuffer::from_arrow_buffer(inner, Alignment::of::<u8>())].into()),

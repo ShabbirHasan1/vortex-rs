@@ -126,6 +126,7 @@ struct Inner {
     // Pre-computed values.
     len: usize,
     true_count: usize,
+    // TODO: why not compute this on demand its pretty cheep
     selectivity: f64,
 }
 
@@ -361,6 +362,10 @@ impl FilterMask {
         self.0.true_count
     }
 
+    pub fn keep_all(&self) -> bool {
+        self.true_count() == self.len()
+    }
+
     /// Get the false count of the mask.
     #[inline]
     pub fn false_count(&self) -> usize {
@@ -402,6 +407,10 @@ impl FilterMask {
         } else {
             FilterIter::Indices(self.indices())
         }
+    }
+
+    pub fn take(&self, offset: usize) -> Self {
+        self.slice(offset, self.len() - offset)
     }
 
     /// Slice the mask.

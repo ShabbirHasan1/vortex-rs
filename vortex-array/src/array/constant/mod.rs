@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use vortex_error::{VortexExpect, VortexResult};
 use vortex_scalar::{Scalar, ScalarValue};
 
+use crate::compute::FilterMask;
 use crate::encoding::ids;
 use crate::stats::{Stat, StatisticsVTable, StatsSet};
 use crate::validate::ValidateVTable;
@@ -38,11 +39,12 @@ impl ConstantArray {
         S: Into<Scalar>,
     {
         let scalar = scalar.into();
+        let mask = FilterMask::new_true(length);
         let stats = StatsSet::constant(&scalar, length);
         let (dtype, scalar_value) = scalar.into_parts();
         Self::try_from_parts(
             dtype,
-            length,
+            mask,
             ConstantMetadata { scalar_value },
             None,
             None,

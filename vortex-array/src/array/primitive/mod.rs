@@ -8,6 +8,7 @@ use vortex_buffer::{Alignment, Buffer, BufferMut, ByteBuffer};
 use vortex_dtype::{match_each_native_ptype, DType, NativePType, Nullability, PType};
 use vortex_error::{vortex_bail, vortex_panic, VortexExpect as _, VortexResult};
 
+use crate::compute::FilterMask;
 use crate::encoding::ids;
 use crate::iter::Accessor;
 use crate::stats::StatsSet;
@@ -40,7 +41,7 @@ impl PrimitiveArray {
         let len = buffer.len();
         Self::try_from_parts(
             DType::from(T::PTYPE).with_nullability(validity.nullability()),
-            len,
+            FilterMask::new_true(len),
             PrimitiveMetadata {
                 validity: validity.to_metadata(len).vortex_expect("Invalid validity"),
             },
@@ -92,7 +93,7 @@ impl PrimitiveArray {
     pub fn validity(&self) -> Validity {
         self.metadata().validity.to_validity(|| {
             self.as_ref()
-                .child(0, &Validity::DTYPE, self.len())
+                .child(0, &Validity::DTYPE, self.0.mask())
                 .vortex_expect("PrimitiveArray: validity child")
         })
     }

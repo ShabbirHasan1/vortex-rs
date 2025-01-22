@@ -6,13 +6,14 @@ use serde::{Deserialize, Serialize};
 use vortex_dtype::{DType, ExtDType, ExtID};
 use vortex_error::{VortexExpect as _, VortexResult};
 
+use crate::compute::FilterMask;
 use crate::encoding::ids;
 use crate::stats::{ArrayStatistics as _, Stat, StatisticsVTable, StatsSet};
 use crate::validate::ValidateVTable;
 use crate::validity::{ArrayValidity, LogicalValidity, ValidityVTable};
 use crate::variants::{ExtensionArrayTrait, VariantsVTable};
 use crate::visitor::{ArrayVisitor, VisitorVTable};
-use crate::{impl_encoding, ArrayDType, ArrayData, ArrayLen, Canonical, IntoCanonical};
+use crate::{impl_encoding, ArrayDType, ArrayData, Canonical, IntoCanonical};
 
 mod compute;
 
@@ -37,7 +38,7 @@ impl ExtensionArray {
 
         Self::try_from_parts(
             DType::Extension(ext_dtype),
-            storage.len(),
+            FilterMask::new_true(storage.len()),
             ExtensionMetadata,
             None,
             Some([storage].into()),
@@ -48,7 +49,7 @@ impl ExtensionArray {
 
     pub fn storage(&self) -> ArrayData {
         self.as_ref()
-            .child(0, self.ext_dtype().storage_dtype(), self.len())
+            .child(0, self.ext_dtype().storage_dtype(), self.0.mask())
             .vortex_expect("Missing storage array for ExtensionArray")
     }
 
