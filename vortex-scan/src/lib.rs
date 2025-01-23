@@ -3,6 +3,13 @@
 //! The [`Scanner`] object is responsible for storing state related to a scan operation, including
 //! expression selectivity metrics, in order to continually optimize the execution plan for each
 //! row-range of the scan.
+//!
+//! ## References
+//!
+//! * **Yinan Li, Jianan Lu, and Badrish Chandramouli. 2023.**
+//!   Selection Pushdown in Column Stores using Bit Manipulation Instructions.
+//!   Proc. ACM Manag. Data 1, 2, Article 178 (June 2023), 26 pages.
+//!   <https://doi.org/10.1145/3589323>
 #![deny(missing_docs)]
 mod range_scan;
 mod row_mask;
