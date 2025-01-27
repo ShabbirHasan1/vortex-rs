@@ -25,6 +25,8 @@ impl CompareFn<FoRArray> for FoREncoding {
             }
         }
 
+        println!("none");
+
         Ok(None)
     }
 }
@@ -39,6 +41,26 @@ where
     T: TryFrom<PValue, Error = VortexError>,
     Scalar: From<Option<T>>,
 {
+    println!("compare for lhs {}", lhs.as_ref().tree_display());
+    // println!(
+    //     "compare for lhs stats min={:?}, max={:?}",
+    //     lhs.encoded()
+    //         .statistics()
+    //         .compute_min::<u64>()
+    //         .map(|s| (s << lhs.shift()) + lhs.metadata().reference.as_u64().unwrap()),
+    //     lhs.encoded()
+    //         .statistics()
+    //         .compute_max::<u64>()
+    //         .map(|s| (s << lhs.shift()) + lhs.metadata().reference.as_u64().unwrap()),
+    // );
+    // println!(
+    //     "compare for lhs encoded stats min={:?}, max={:?}",
+    //     lhs.encoded().statistics().compute_min::<u64>(),
+    //     lhs.encoded().statistics().compute_max::<u64>(),
+    // );
+    println!("compare for rhs {:?}", rhs);
+    println!("compare for op {}", operator);
+
     // For now, we only support equals and not equals. Comparisons are a little more fiddly to
     // get right regarding how to handle overflow and the wrapping subtraction.
     if !matches!(operator, Operator::Eq | Operator::NotEq) {
@@ -53,16 +75,18 @@ where
         if let Some(reference) = reference {
             rhs = rhs.wrapping_sub(&reference);
         }
-        if lhs.shift() > 0 {
-            // Since compare requires that both sides are of same dtype this will always succeed and not panic
-            rhs = rhs >> (lhs.shift() as u32)
-        }
+        // if lhs.shift() > 0 {
+        // Since compare requires that both sides are of same dtype this will always succeed and not panic
+        rhs = rhs >> (lhs.shift() as u32);
+        // }
         rhs
     });
 
     // Wrap up the RHS into a scalar and cast to the encoded DType (this will be the equivalent
     // unsigned integer type).
     let rhs = Scalar::from(rhs).reinterpret_cast(T::PTYPE.to_unsigned());
+
+    println!("new rhs {:?}", rhs);
 
     compare(
         lhs.encoded(),

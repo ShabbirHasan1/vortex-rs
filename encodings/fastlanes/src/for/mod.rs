@@ -44,6 +44,7 @@ impl FoRArray {
                 .dtype()
                 .with_nullability(child.dtype().nullability()),
         )?;
+        // sub then shift
 
         let dtype = reference.dtype().clone();
 
