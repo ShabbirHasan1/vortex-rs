@@ -60,6 +60,8 @@ impl BoolArray {
     pub fn into_buffer(self) -> ByteBuffer {
         self.into_array()
             .into_byte_buffer(0)
+            // BooleanBuffer is internally stored as u64 values
+            .map(|b| b.ensure_aligned(Alignment::of::<u64>()))
             .vortex_expect("BoolArray must have a buffer")
     }
 
@@ -136,7 +138,7 @@ impl BoolArray {
                 validity: validity.to_metadata(buffer_len)?,
                 first_byte_bit_offset,
             }),
-            Some(vec![ByteBuffer::from_arrow_buffer(inner, Alignment::of::<u8>())].into()),
+            Some(vec![ByteBuffer::from_arrow_buffer(inner, Alignment::of::<u64>())].into()),
             validity.into_array().map(|v| [v].into()),
             StatsSet::default(),
         )
