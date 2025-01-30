@@ -9,6 +9,7 @@ use crate::array::{ListArray, ListEncoding};
 use crate::arrow::IntoArrowArray;
 use crate::compute::{try_cast, ToArrowFn};
 use crate::variants::PrimitiveArrayTrait;
+use crate::vtable::ValidityVTable;
 use crate::IntoArrayVariant;
 
 impl ToArrowFn<ListArray> for ListEncoding {
