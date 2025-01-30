@@ -112,7 +112,7 @@ jobs:
           - name: "wasm32 with default features"
             command: "build"
             target: wasm32-unknown-unknown
-            args: "--target wasm32-unknown-unknown --exclude vortex-roaring --exclude vortex-datafusion --exclude vortex-cli"
+            args: "--target wasm32-unknown-unknown --exclude vortex-roaring --exclude vortex-datafusion --exclude vortex-tui"
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/cleanup
@@ -165,6 +165,7 @@ jobs:
       - uses: rui314/setup-mold@v1
       - uses: ./.github/actions/setup-rust
       - name: Install grcov
+        if: github.ref == 'refs/heads/develop'
         run: cargo install grcov
       - uses: taiki-e/install-action@v2
         with:
