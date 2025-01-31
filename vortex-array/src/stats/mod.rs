@@ -244,6 +244,15 @@ impl dyn Statistics + '_ {
             })
     }
 
+    pub fn get_as2<S, U: for<'a> TryFrom<&'a ScalarValue, Error = VortexError>>(
+        &self,
+    ) -> Option<Precision<U>>
+    where
+        S: StatType<U>
+    {
+        self.get_as(S::STAT)
+    }
+
     pub fn get_as_bound<S, U>(&self) -> Option<S::Bound>
     where
         S: StatType<U>,

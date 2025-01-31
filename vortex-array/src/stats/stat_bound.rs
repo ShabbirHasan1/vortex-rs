@@ -37,6 +37,7 @@ impl<T> Precision<T> {
 
 /// These structs allow the extraction of the bound from the `Precision` value.
 /// They tie together the Stat and the StatBound, which allows the bound to be extracted.
+#[derive(Clone)]
 pub struct Max;
 pub struct Min;
 pub struct BitWidthFreq;
@@ -48,6 +49,8 @@ pub struct RunCount;
 pub struct TrueCount;
 pub struct NullCount;
 pub struct UncompressedSizeInBytes;
+
+
 
 impl<T: PartialOrd + Clone> StatType<T> for BitWidthFreq {
     type Bound = UpperBound<T>;
@@ -85,14 +88,14 @@ impl<T: PartialOrd + Clone> StatType<T> for RunCount {
     const STAT: Stat = Stat::RunCount;
 }
 
-impl<T: PartialOrd + Clone> StatType<T> for TrueCount {
-    type Bound = UpperBound<T>;
+impl StatType<u64> for TrueCount {
+    type Bound = UpperBound<u64>;
 
     const STAT: Stat = Stat::TrueCount;
 }
 
-impl<T: PartialOrd + Clone> StatType<T> for NullCount {
-    type Bound = UpperBound<T>;
+impl StatType<u64> for NullCount {
+    type Bound = UpperBound<u64>;
 
     const STAT: Stat = Stat::NullCount;
 }

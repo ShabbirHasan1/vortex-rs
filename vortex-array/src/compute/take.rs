@@ -1,7 +1,7 @@
 use vortex_error::{vortex_bail, vortex_err, VortexError, VortexResult};
 
 use crate::encoding::Encoding;
-use crate::stats::{Max, Stat, Statistics, StatsSet};
+use crate::stats::{Max, Stat, Statistics, StatsSet, TrueCount};
 use crate::{Array, IntoArray, IntoCanonical};
 
 pub trait TakeFn<A> {
@@ -52,6 +52,8 @@ pub fn take(array: impl AsRef<Array>, indices: impl AsRef<Array>) -> VortexResul
             indices.dtype()
         );
     }
+
+    let _two = indices.statistics().get_as_bound::<TrueCount, _>();
 
     // If the indices are all within bounds, we can skip bounds checking.
     let checked_indices = indices
