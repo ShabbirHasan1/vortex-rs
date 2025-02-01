@@ -27,6 +27,7 @@ pub mod sparse;
 pub mod struct_;
 pub mod varbin;
 pub mod zigzag;
+mod stateful;
 
 pub trait EncodingCompressor: Sync + Send + Debug {
     fn id(&self) -> &str;
