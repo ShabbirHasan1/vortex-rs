@@ -1,4 +1,5 @@
 use vortex_error::{VortexError, VortexResult};
+use vortex_scalar::ScalarValue;
 
 use crate::compute::{min_max, MinMaxResult};
 use crate::encoding::Encoding;
@@ -72,8 +73,18 @@ impl Array {
             }
         }
 
+        if let Some(stat_val) = set.get(stat) {
+            self.set(stat, stat_val.clone());
+        }
         // TODO(joe): infer more stats from other stat combinations.
 
         Ok(set)
+    }
+
+    pub fn compute_statistic(&self, stat: Stat) -> VortexResult<Option<ScalarValue>> {
+        Ok(self
+            .compute_statistics(stat)?
+            .get(stat)
+            .and_then(Precision::some_exact))
     }
 }

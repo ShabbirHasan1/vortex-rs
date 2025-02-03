@@ -10,7 +10,7 @@ impl StatisticsVTable<DictArray> for DictEncoding {
 
         match stat {
             Stat::RunCount => {
-                if let Some(rc) = array.codes().statistics().compute(Stat::RunCount) {
+                if let Some(rc) = array.codes().compute_statistic(Stat::RunCount) {
                     stats.set(Stat::RunCount, Precision::exact(rc));
                 }
             }
