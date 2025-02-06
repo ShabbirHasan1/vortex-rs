@@ -123,7 +123,7 @@ jobs:
           BENCH_VORTEX_RATIOS: '.*'
           RUSTFLAGS: '-C target-cpu=native'
         run: |
-          cargo run --bin tpch_benchmark --release -- -d gh-json -t 1 | tee tpch.json
+          cargo run --locked --bin tpch_benchmark --release -- -d gh-json -t 1 | tee tpch.json
       - name: Setup AWS CLI
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -181,7 +181,7 @@ jobs:
           RUSTFLAGS: '-C target-cpu=native'
           HOME: /home/ci-runner
         run: |
-          cargo run --bin clickbench --release -- -d gh-json | tee clickbench.json
+          cargo run --locked --bin clickbench --release -- -d gh-json | tee clickbench.json
       - name: Setup AWS CLI
         uses: aws-actions/configure-aws-credentials@v4
         with:
