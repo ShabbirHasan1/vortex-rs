@@ -13,8 +13,8 @@ use crate::variants::PrimitiveArrayTrait;
 use crate::{Array, Canonical, IntoArray, IntoCanonical};
 
 pub struct PrimitiveBuilder<T: NativePType> {
-    values: BufferMut<T>,
-    validity: NullBufferBuilder,
+    pub values: BufferMut<T>,
+    pub validity: NullBufferBuilder,
     dtype: DType,
 }
 

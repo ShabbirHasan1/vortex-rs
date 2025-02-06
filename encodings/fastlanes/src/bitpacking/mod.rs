@@ -3,7 +3,7 @@ use std::fmt::{Debug, Display};
 pub use compress::*;
 use fastlanes::BitPacking;
 use vortex_array::array::PrimitiveArray;
-use vortex_array::builders::ArrayBuilder;
+use vortex_array::builders::{ArrayBuilder, PrimitiveBuilder};
 use vortex_array::patches::{Patches, PatchesMetadata};
 use vortex_array::stats::StatsSet;
 use vortex_array::validity::{Validity, ValidityMetadata};
@@ -13,9 +13,9 @@ use vortex_array::vtable::{
     CanonicalVTable, StatisticsVTable, ValidateVTable, ValidityVTable, VariantsVTable,
     VisitorVTable,
 };
-use vortex_array::{encoding_ids, impl_encoding, Array, Canonical, IntoArray, RkyvMetadata};
+use vortex_array::{encoding_ids, impl_encoding, Array, Canonical, RkyvMetadata};
 use vortex_buffer::ByteBuffer;
-use vortex_dtype::{DType, NativePType, PType};
+use vortex_dtype::{match_each_unsigned_integer_ptype, DType, NativePType, PType};
 use vortex_error::{vortex_bail, vortex_err, VortexExpect as _, VortexResult};
 use vortex_mask::Mask;
 
@@ -263,9 +263,25 @@ impl CanonicalVTable<BitPackedArray> for BitPackedEncoding {
         array: BitPackedArray,
         builder: &mut dyn ArrayBuilder,
     ) -> VortexResult<()> {
-        // TODO(joe): add specialised impl
-        builder.extend_from_array(array.into_array())
+        match_each_unsigned_integer_ptype!(array.ptype().to_unsigned(), |$P| {
+            canonicalize_into_builder::<$P>(array, builder)
+        })
     }
+}
+
+fn canonicalize_into_builder<T>(
+    array: BitPackedArray,
+    builder: &mut dyn ArrayBuilder,
+) -> VortexResult<()>
+where
+    T: NativePType + BitPacking,
+{
+    let builder = builder
+        .as_any_mut()
+        .downcast_mut::<PrimitiveBuilder<T>>()
+        .ok_or_else(|| vortex_err!("Builder is not a PrimitiveBuilder"))?;
+
+    unpack_into(array, builder)
 }
 
 impl ValidityVTable<BitPackedArray> for BitPackedEncoding {
