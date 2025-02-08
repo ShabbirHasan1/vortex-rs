@@ -22,7 +22,7 @@ use tracing::instrument::WithSubscriber;
 use tracing::{debug, info, info_span, Level};
 use tracing_subscriber::fmt::format::FmtSpan;
 use url::Url;
-use vortex_datafusion::persistent::format::VortexFormat;
+use vortex_datafusion::persistent::VortexFormat;
 
 #[derive(Parser, Debug)]
 struct Cli {
@@ -146,7 +146,7 @@ async fn async_main(cli: Cli) {
     for query in queries_to_run {
         if query == 15 {
             info!("skipping q15, datafusion only supports single statements");
-            continue
+            continue;
         }
         let _span = info_span!("tpch", query = query);
         info!(query = query, "begin query");
