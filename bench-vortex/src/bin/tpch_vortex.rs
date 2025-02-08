@@ -206,7 +206,7 @@ async fn register_table(
 
     debug!(table = name, url = file_url.as_str(), "registering table");
 
-    let file_format = Arc::new(VortexFormat::new(&CTX));
+    let file_format = Arc::new(VortexFormat::new(CTX.clone()));
     let table_url = ListingTableUrl::parse(file_url.as_str())?;
     info!(table_url = table_url.as_str(), "using table_url");
 
