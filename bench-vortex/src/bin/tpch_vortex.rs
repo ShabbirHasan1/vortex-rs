@@ -6,13 +6,12 @@
 
 use std::sync::Arc;
 
-use anyhow::Context;
 use bench_vortex::CTX;
 use clap::{ArgAction, Parser, ValueEnum};
 use datafusion::datasource::listing::{
     ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl,
 };
-use datafusion::prelude::SessionContext;
+use datafusion::prelude::{ParquetReadOptions, SessionContext};
 use object_store::aws::AmazonS3Builder;
 use object_store::gcp::GoogleCloudStorageBuilder;
 use object_store::local::LocalFileSystem;
@@ -206,18 +205,35 @@ async fn register_table(
 
     debug!(table = name, url = file_url.as_str(), "registering table");
 
-    let file_format = Arc::new(VortexFormat::new(CTX.clone()));
     let table_url = ListingTableUrl::parse(file_url.as_str())?;
     info!(table_url = table_url.as_str(), "using table_url");
 
-    let config = ListingTableConfig::new(table_url)
-        .with_listing_options(ListingOptions::new(file_format as _))
-        .infer_schema(&df.state())
-        .await
-        .context("inferring schema")?;
+    // let config = ListingTableConfig::new(table_url)
+    //     .with_listing_options(ListingOptions::new(file_format as _))
+    //     .infer_schema(&df.state())
+    //     .await
+    //     .context("inferring schema")?;
 
-    let listing_table = Arc::new(ListingTable::try_new(config)?);
-    df.register_table(name, listing_table)?;
+    // let listing_table = Arc::new(ListingTable::try_new(config)?);
+    // df.register_table(name, listing_table)?;
+
+    match format {
+        Format::Vortex => {
+            let format = Arc::new(VortexFormat::new(CTX.clone()));
+            let config = ListingTableConfig::new(table_url)
+                .with_listing_options(ListingOptions::new(format as _))
+                .infer_schema(&df.state())
+                .await?;
+
+            let listing_table = Arc::new(ListingTable::try_new(config)?);
+
+            df.register_table(name, listing_table as _)?;
+        }
+        Format::Parquet => {
+            df.register_parquet(name, table_url.as_str(), ParquetReadOptions::default())
+                .await?;
+        }
+    };
 
     Ok(())
 }
