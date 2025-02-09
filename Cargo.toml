@@ -201,7 +201,7 @@ url = "2.5.4"
 # # =======
 # # thiserror = "2.0.0"
 # # tokio = "1.37.0"
-# tracing-subscriber = "0.3"
+tracing-subscriber = "0.3"
 # # url = "2"
 # # >>>>>>> 8e8ac02e0 (save)
 # >>>>>>> cda0da89a (save)
