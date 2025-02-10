@@ -43,7 +43,9 @@ impl ExprEvaluator for StructReader {
         )?
         .into_array();
 
-        partitioned.root.evaluate(&root_scope)
+        self.executor
+            .evaluate(root_scope, None, Some(&partitioned.root))
+            .await
     }
 }
 

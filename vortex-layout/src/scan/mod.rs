@@ -1,12 +1,13 @@
 use std::future::Future;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use futures::future::BoxFuture;
 use futures::{stream, FutureExt, Stream};
 use itertools::Itertools;
 use oneshot;
 use vortex_array::stream::{ArrayStream, ArrayStreamAdapter, ArrayStreamExt};
-use vortex_buffer::Buffer;
+use vortex_buffer::{Buffer, ByteBuffer};
 use vortex_expr::{ExprRef, Identity};
 mod split_by;
 pub mod unified;
@@ -22,17 +23,27 @@ use vortex_mask::Mask;
 use vortex_scan::{RowMask, Scanner};
 
 use crate::scan::unified::UnifiedDriverStream;
-use crate::segments::AsyncSegmentReader;
+use crate::segments::SegmentId;
 use crate::{ExprEvaluator, Layout, LayoutReader};
 
-pub trait ScanTask {
-    fn execute(&self, segments: &dyn AsyncSegmentReader) -> BoxFuture<()>;
+#[async_trait]
+pub trait ScanExecutor: 'static + Send + Sync {
+    /// Attempt to get the data associated with a given segment ID.
+    async fn get_segment(&self, id: SegmentId) -> VortexResult<ByteBuffer>;
+
+    /// Execute the given array compute.
+    async fn evaluate(
+        &self,
+        array: Array,
+        mask: Option<&Mask>,
+        expr: Option<&ExprRef>,
+    ) -> VortexResult<Array>;
 }
 
 pub trait ScanDriver: 'static + Sized {
     type Options: Default;
 
-    fn segment_reader(&self) -> Arc<dyn AsyncSegmentReader>;
+    fn executor(&self) -> Arc<dyn ScanExecutor>;
 
     fn drive_future(
         self,
@@ -211,7 +222,7 @@ impl<D: ScanDriver> Scan<D> {
         // Create a single LayoutReader that is reused for the entire scan.
         let reader: Arc<dyn LayoutReader> = self
             .layout
-            .reader(self.driver.segment_reader(), self.ctx.clone())?;
+            .reader(self.ctx.clone(), self.driver.executor())?;
 
         let mut results = Vec::with_capacity(self.row_masks.len());
         let mut tasks = Vec::with_capacity(self.row_masks.len());

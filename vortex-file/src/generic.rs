@@ -3,16 +3,22 @@ use std::marker::PhantomData;
 use std::ops::Range;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use futures::Stream;
 use futures_util::future::BoxFuture;
 use futures_util::stream::FuturesUnordered;
 use futures_util::{stream, StreamExt, TryStreamExt};
+use tokio::runtime::Handle;
+use vortex_array::compute::filter;
+use vortex_array::Array;
 use vortex_buffer::{Alignment, ByteBuffer};
 use vortex_error::{vortex_err, vortex_panic, VortexExpect, VortexResult};
+use vortex_expr::ExprRef;
 use vortex_io::VortexReadAt;
 use vortex_layout::scan::unified::UnifiedDriverStream;
-use vortex_layout::scan::ScanDriver;
+use vortex_layout::scan::{ScanDriver, ScanExecutor};
 use vortex_layout::segments::{AsyncSegmentReader, SegmentId};
+use vortex_mask::Mask;
 
 use crate::exec::ExecutionMode;
 use crate::footer::{FileLayout, Segment};
@@ -93,10 +99,11 @@ pub struct GenericScanDriver<R> {
 impl<R: VortexReadAt> ScanDriver for GenericScanDriver<R> {
     type Options = GenericScanOptions;
 
-    fn segment_reader(&self) -> Arc<dyn AsyncSegmentReader> {
-        // This reader simply enqueues segment requests into the channel.
-        // Our driver polls the other end of this channel to drive the I/O requests.
-        self.segment_channel.reader()
+    fn executor(&self) -> Arc<dyn ScanExecutor> {
+        Arc::new(GenericScanExecutor {
+            segment_reader: self.segment_channel.reader(),
+            handle: Handle::current(),
+        })
     }
 
     fn drive_stream(
@@ -209,6 +216,41 @@ impl<R: VortexReadAt> ScanDriver for GenericScanDriver<R> {
             exec_stream,
             io_stream,
         }
+    }
+}
+
+pub struct GenericScanExecutor {
+    segment_reader: Arc<dyn AsyncSegmentReader>,
+    handle: Handle,
+}
+
+#[async_trait]
+impl ScanExecutor for GenericScanExecutor {
+    async fn get_segment(&self, id: SegmentId) -> VortexResult<ByteBuffer> {
+        self.segment_reader.get(id).await
+    }
+
+    async fn evaluate(
+        &self,
+        array: Array,
+        mask: Option<&Mask>,
+        expr: Option<&ExprRef>,
+    ) -> VortexResult<Array> {
+        let mask = mask.cloned();
+        let expr = expr.cloned();
+        self.handle
+            .spawn_blocking(move || {
+                let mut array = array;
+                if let Some(mask) = mask {
+                    array = filter(&array, &mask)?;
+                }
+                if let Some(expr) = expr {
+                    array = expr.evaluate(&array)?;
+                }
+                Ok(array)
+            })
+            .await
+            .map_err(|e| vortex_err!("spawn_blocking failed {}", e))?
     }
 }
 

@@ -1,4 +1,3 @@
-use std::hash::Hash;
 use std::sync::{Arc, OnceLock, RwLock};
 
 use vortex_array::aliases::hash_map::{Entry, HashMap};
@@ -8,16 +7,16 @@ use vortex_error::{vortex_err, vortex_panic, VortexExpect, VortexResult};
 use vortex_expr::transform::partition::{partition, PartitionedExpr};
 use vortex_expr::ExprRef;
 
+use crate::layouts::exact_expr::ExactExpr;
 use crate::layouts::struct_::StructLayout;
-use crate::segments::AsyncSegmentReader;
+use crate::scan::ScanExecutor;
 use crate::{Layout, LayoutReader, LayoutReaderExt, LayoutVTable};
 
 #[derive(Clone)]
 pub struct StructReader {
     layout: Layout,
     ctx: ContextRef,
-
-    segments: Arc<dyn AsyncSegmentReader>,
+    pub(crate) executor: Arc<dyn ScanExecutor>,
 
     field_readers: Arc<[OnceLock<Arc<dyn LayoutReader>>]>,
     field_lookup: Option<HashMap<FieldName, usize>>,
@@ -27,8 +26,8 @@ pub struct StructReader {
 impl StructReader {
     pub(super) fn try_new(
         layout: Layout,
-        segments: Arc<dyn AsyncSegmentReader>,
         ctx: ContextRef,
+        executor: Arc<dyn ScanExecutor>,
     ) -> VortexResult<Self> {
         if layout.encoding().id() != StructLayout.id() {
             vortex_panic!("Mismatched layout ID")
@@ -56,7 +55,7 @@ impl StructReader {
         Ok(Self {
             layout,
             ctx,
-            segments,
+            executor,
             field_readers,
             field_lookup,
             expr_cache: Arc::new(Default::default()),
@@ -84,7 +83,7 @@ impl StructReader {
             let child_layout = self
                 .layout
                 .child(idx, self.struct_dtype().field_by_index(idx)?)?;
-            child_layout.reader(self.segments.clone(), self.ctx.clone())
+            child_layout.reader(self.ctx.clone(), self.executor.clone())
         })
     }
 
@@ -109,24 +108,5 @@ impl StructReader {
 impl LayoutReader for StructReader {
     fn layout(&self) -> &Layout {
         &self.layout
-    }
-}
-
-/// An expression wrapper that performs pointer equality.
-/// NOTE(ngates): we should consider if this shoud live in vortex-expr crate?
-#[derive(Clone)]
-struct ExactExpr(ExprRef);
-
-impl PartialEq for ExactExpr {
-    fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &other.0)
-    }
-}
-
-impl Eq for ExactExpr {}
-
-impl Hash for ExactExpr {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        Arc::as_ptr(&self.0).hash(state)
     }
 }

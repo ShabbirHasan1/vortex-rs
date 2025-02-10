@@ -32,7 +32,7 @@ impl SegmentChannel {
     }
 
     /// Returns a reader for the segment cache.
-    pub fn reader(&self) -> Arc<dyn AsyncSegmentReader + 'static> {
+    pub fn reader(&self) -> Arc<dyn AsyncSegmentReader> {
         Arc::new(SegmentChannelReader(self.request_send.clone()))
     }
 
