@@ -68,7 +68,7 @@ impl ExprEvaluator for ChunkedReader {
 
         let chunks = chunks.try_collect::<Vec<_>>().await?;
 
-        Ok(ChunkedArray::try_new(chunks, dtype)?.into_array())
+        Ok(ChunkedArray::try_new_unchecked(chunks, dtype).into_array())
     }
 }
 
