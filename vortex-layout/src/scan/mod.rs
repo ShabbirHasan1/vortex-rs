@@ -377,6 +377,7 @@ pin_project_lite::pin_project! {
         #[pin]
         inner: F,
         thread: ThreadId,
+        counter: AtomicUsize,
     }
 }
 
@@ -388,6 +389,7 @@ where
         Self {
             inner: f,
             thread: std::thread::current().id(),
+            counter: AtomicUsize::new(1),
         }
     }
 }
@@ -412,11 +414,12 @@ where
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         let this = self.project();
-        static COUNTER: AtomicUsize = AtomicUsize::new(1);
 
         let current_thread_id = std::thread::current().id();
         if *this.thread != current_thread_id {
-            let total_moves = COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let total_moves = this
+                .counter
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             eprintln!(
                 "moved from {:?} to {:?}, {total_moves} total move",
                 *this.thread, current_thread_id
