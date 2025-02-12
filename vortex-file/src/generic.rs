@@ -8,7 +8,7 @@ use futures::{stream, Stream, StreamExt, TryStreamExt};
 use vortex_buffer::{Alignment, ByteBuffer};
 use vortex_error::{vortex_err, vortex_panic, VortexExpect, VortexResult};
 use vortex_io::VortexReadAt;
-use vortex_layout::scan::ScanDriver;
+use vortex_layout::scan::{ScanDriver, TrackThreadFuture};
 use vortex_layout::segments::{AsyncSegmentReader, SegmentId};
 
 use crate::footer::{FileLayout, Segment};
@@ -215,10 +215,11 @@ async fn evaluate<R: VortexReadAt>(
         request.byte_range,
         request.byte_range.end - request.byte_range.start,
     );
-    let buffer: ByteBuffer = read
-        .read_byte_range(request.byte_range.clone(), request.alignment)
-        .await?
-        .aligned(Alignment::none());
+    let buffer: ByteBuffer = TrackThreadFuture::from(
+        read.read_byte_range(request.byte_range.clone(), request.alignment),
+    )
+    .await?
+    .aligned(Alignment::none());
 
     // Figure out the segments covered by the read.
     let start = segment_map.partition_point(|s| s.offset < request.byte_range.start);

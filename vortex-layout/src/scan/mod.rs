@@ -1,4 +1,7 @@
+use std::future::Future;
+use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
+use std::thread::ThreadId;
 
 use futures::stream::BoxStream;
 use futures::{stream, Stream};
@@ -367,4 +370,60 @@ fn field_mask(
         .cloned()
         .map(|c| FieldMask::Prefix(FieldPath::from(Field::Name(c))))
         .collect_vec())
+}
+
+pin_project_lite::pin_project! {
+    pub struct TrackThreadFuture<F> {
+        #[pin]
+        inner: F,
+        thread: ThreadId,
+    }
+}
+
+impl<F, O> TrackThreadFuture<F>
+where
+    F: Future<Output = O>,
+{
+    pub fn new(f: F) -> Self {
+        Self {
+            inner: f,
+            thread: std::thread::current().id(),
+        }
+    }
+}
+
+impl<F, O> From<F> for TrackThreadFuture<F>
+where
+    F: Future<Output = O>,
+{
+    fn from(value: F) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<F, O> Future for TrackThreadFuture<F>
+where
+    F: Future<Output = O>,
+{
+    type Output = O;
+
+    fn poll(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let this = self.project();
+        static COUNTER: AtomicUsize = AtomicUsize::new(1);
+
+        let current_thread_id = std::thread::current().id();
+        if *this.thread != current_thread_id {
+            let total_moves = COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            eprintln!(
+                "moved from {:?} to {:?}, {total_moves} total move",
+                *this.thread, current_thread_id
+            );
+        }
+        *this.thread = current_thread_id;
+
+        this.inner.poll(cx)
+    }
 }
