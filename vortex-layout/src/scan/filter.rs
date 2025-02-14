@@ -14,6 +14,7 @@ use vortex_expr::transform::immediate_access::immediate_scope_access;
 use vortex_expr::{get_item, ident, or, ExprRef};
 use vortex_mask::Mask;
 
+use crate::segments::AsyncSegmentReader;
 use crate::{ExprEvaluator, RowMask};
 
 /// Perform a filter before evaluating the expression if the mask drops below this density.
@@ -213,11 +214,16 @@ pub struct FilterEvaluation {
 }
 
 impl FilterEvaluation {
-    pub async fn evaluate<E: ExprEvaluator>(&mut self, evaluator: E) -> VortexResult<RowMask> {
+    pub async fn evaluate<E: ExprEvaluator>(
+        &mut self,
+        segments: &dyn AsyncSegmentReader,
+        evaluator: E,
+    ) -> VortexResult<RowMask> {
         // First, we run all conjuncts through the evaluators pruning function. This helps trim
         // down the mask based on cheap statistics.
         let pruning_masks = try_join_all(self.filter_expr.conjuncts.iter().map(|expr| {
             evaluator.prune_mask(
+                segments,
                 RowMask::new(Mask::new_true(self.mask.len()), self.row_offset),
                 expr.clone(),
             )
@@ -265,6 +271,7 @@ impl FilterEvaluation {
                 .map(|&field_idx| self.filter_expr.fields[field_idx].clone())
                 .map(|field_name| {
                     evaluator.evaluate_expr(
+                        segments,
                         RowMask::new(Mask::new_true(self.mask.len()), self.row_offset),
                         get_item(field_name, ident()),
                     )
@@ -300,13 +307,18 @@ impl FilterEvaluation {
                 // selectivity of the conjunction.
                 // TODO(ngates): we already have the arrays, we could use our own?
                 let result = evaluator
-                    .evaluate_expr(RowMask::new(self.mask.clone(), self.row_offset), conjunct)
+                    .evaluate_expr(
+                        segments,
+                        RowMask::new(self.mask.clone(), self.row_offset),
+                        conjunct,
+                    )
                     .await?;
                 // Use a rank-intersection to explode the result into the full mask.
                 self.mask.intersect_by_rank(&Mask::try_from(result)?)
             } else {
                 let result = evaluator
                     .evaluate_expr(
+                        segments,
                         RowMask::new(Mask::new_true(self.mask.len()), self.row_offset),
                         conjunct.clone(),
                     )

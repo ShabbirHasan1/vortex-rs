@@ -8,12 +8,17 @@ use vortex_error::{VortexExpect, VortexResult};
 use vortex_expr::ExprRef;
 
 use crate::layouts::struct_::reader::StructReader;
-use crate::scan::ScanTask;
+use crate::segments::AsyncSegmentReader;
 use crate::{ExprEvaluator, RowMask};
 
 #[async_trait]
 impl ExprEvaluator for StructReader {
-    async fn evaluate_expr(&self, row_mask: RowMask, expr: ExprRef) -> VortexResult<Array> {
+    async fn evaluate_expr(
+        &self,
+        segments: &dyn AsyncSegmentReader,
+        row_mask: RowMask,
+        expr: ExprRef,
+    ) -> VortexResult<Array> {
         // Partition the expression into expressions that can be evaluated over individual fields
         let partitioned = self.partition_expr(expr.clone())?;
         let field_readers: Vec<_> = partitioned
@@ -26,7 +31,7 @@ impl ExprEvaluator for StructReader {
         if partitioned.partitions.len() == 1 {
             return self
                 .child(&partitioned.partition_names[0])?
-                .evaluate_expr(row_mask, partitioned.partitions[0].clone())
+                .evaluate_expr(segments, row_mask, partitioned.partitions[0].clone())
                 .await;
         }
 
@@ -36,7 +41,7 @@ impl ExprEvaluator for StructReader {
                 .iter()
                 .zip_eq(partitioned.partitions.iter())
                 .map(|(reader, partition)| {
-                    reader.evaluate_expr(row_mask.clone(), partition.clone())
+                    reader.evaluate_expr(segments, row_mask.clone(), partition.clone())
                 }),
         )
         .await?;
@@ -52,12 +57,15 @@ impl ExprEvaluator for StructReader {
         )?
         .into_array();
 
-        self.executor()
-            .evaluate(&root_scope, &[ScanTask::Expr(partitioned.root.clone())])
-            .await
+        partitioned.root.evaluate(&root_scope)
     }
 
-    async fn prune_mask(&self, row_mask: RowMask, expr: ExprRef) -> VortexResult<RowMask> {
+    async fn prune_mask(
+        &self,
+        segments: &dyn AsyncSegmentReader,
+        row_mask: RowMask,
+        expr: ExprRef,
+    ) -> VortexResult<RowMask> {
         // We currently can only perform pruning if the expression references a single field.
         // Otherwise, we have no good way to recombine the results.
         let partitioned = self.partition_expr(expr.clone())?;
@@ -72,7 +80,7 @@ impl ExprEvaluator for StructReader {
             .next()
             .vortex_expect("one partition");
         self.child(field_name)?
-            .prune_mask(row_mask, partitioned.partitions[0].clone())
+            .prune_mask(segments, row_mask, partitioned.partitions[0].clone())
             .await
     }
 }
@@ -92,13 +100,12 @@ mod tests {
 
     use crate::layouts::flat::writer::FlatLayoutWriter;
     use crate::layouts::struct_::writer::StructLayoutWriter;
-    use crate::scan::ScanExecutor;
     use crate::segments::test::TestSegments;
     use crate::writer::LayoutWriterExt;
     use crate::{Layout, RowMask};
 
     /// Create a chunked layout with three chunks of primitive arrays.
-    fn struct_layout() -> (Arc<ScanExecutor>, Layout) {
+    fn struct_layout() -> (TestSegments, Layout) {
         let mut segments = TestSegments::default();
 
         let layout = StructLayoutWriter::new(
@@ -128,17 +135,18 @@ mod tests {
             .map(IntoArray::into_array)],
         )
         .unwrap();
-        (ScanExecutor::inline(Arc::new(segments)), layout)
+        (segments, layout)
     }
 
     #[test]
     fn test_struct_layout() {
         let (segments, layout) = struct_layout();
 
-        let reader = layout.reader(segments, Default::default()).unwrap();
+        let reader = layout.reader(Default::default()).unwrap();
         let expr = gt(get_item("a", ident()), get_item("b", ident()));
         let result =
-            block_on(reader.evaluate_expr(RowMask::new_valid_between(0, 3), expr)).unwrap();
+            block_on(reader.evaluate_expr(&segments, RowMask::new_valid_between(0, 3), expr))
+                .unwrap();
         assert_eq!(
             vec![true, false, false],
             result
@@ -154,9 +162,10 @@ mod tests {
     fn test_struct_layout_row_mask() {
         let (segments, layout) = struct_layout();
 
-        let reader = layout.reader(segments, Default::default()).unwrap();
+        let reader = layout.reader(Default::default()).unwrap();
         let expr = gt(get_item("a", ident()), get_item("b", ident()));
         let result = block_on(reader.evaluate_expr(
+            &segments,
             // Take rows 0 and 1, skip row 2, and anything after that
             RowMask::new(Mask::from_iter([true, true, false]), 0),
             expr,
@@ -180,9 +189,10 @@ mod tests {
     fn test_struct_layout_select() {
         let (segments, layout) = struct_layout();
 
-        let reader = layout.reader(segments, Default::default()).unwrap();
+        let reader = layout.reader(Default::default()).unwrap();
         let expr = pack([("a", get_item("a", ident())), ("b", get_item("b", ident()))]);
         let result = block_on(reader.evaluate_expr(
+            &segments,
             // Take rows 0 and 1, skip row 2, and anything after that
             RowMask::new(Mask::from_iter([true, true, false]), 0),
             expr,

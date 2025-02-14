@@ -12,7 +12,6 @@ use vortex_error::{vortex_bail, VortexResult};
 
 use crate::data::Layout;
 use crate::reader::{LayoutReader, LayoutReaderExt};
-use crate::scan::ScanExecutor;
 use crate::vtable::LayoutVTable;
 use crate::{LayoutId, COLUMNAR_LAYOUT_ID};
 
@@ -24,13 +23,8 @@ impl LayoutVTable for StructLayout {
         COLUMNAR_LAYOUT_ID
     }
 
-    fn reader(
-        &self,
-        layout: Layout,
-        ctx: ContextRef,
-        executor: Arc<ScanExecutor>,
-    ) -> VortexResult<Arc<dyn LayoutReader>> {
-        Ok(StructReader::try_new(layout, ctx, executor)?.into_arc())
+    fn reader(&self, layout: Layout, ctx: ContextRef) -> VortexResult<Arc<dyn LayoutReader>> {
+        Ok(StructReader::try_new(layout, ctx)?.into_arc())
     }
 
     fn register_splits(

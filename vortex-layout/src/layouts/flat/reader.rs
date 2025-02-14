@@ -6,24 +6,19 @@ use vortex_error::{vortex_err, vortex_panic, VortexExpect, VortexResult};
 
 use crate::layouts::flat::FlatLayout;
 use crate::reader::LayoutReader;
-use crate::scan::ScanExecutor;
+use crate::segments::AsyncSegmentReader;
 use crate::{Layout, LayoutReaderExt, LayoutVTable};
 
 pub struct FlatReader {
     layout: Layout,
     ctx: ContextRef,
-    executor: Arc<ScanExecutor>,
     // TODO(ngates): we need to add an invalidate_row_range function to evict these from the
     //  cache.
     array: Arc<OnceCell<Array>>,
 }
 
 impl FlatReader {
-    pub(crate) fn try_new(
-        layout: Layout,
-        ctx: ContextRef,
-        executor: Arc<ScanExecutor>,
-    ) -> VortexResult<Self> {
+    pub(crate) fn try_new(layout: Layout, ctx: ContextRef) -> VortexResult<Self> {
         if layout.encoding().id() != FlatLayout.id() {
             vortex_panic!("Mismatched layout ID")
         }
@@ -31,7 +26,6 @@ impl FlatReader {
         Ok(Self {
             layout,
             ctx,
-            executor,
             array: Arc::new(Default::default()),
         })
     }
@@ -40,11 +34,7 @@ impl FlatReader {
         self.ctx.clone()
     }
 
-    pub(crate) fn executor(&self) -> &ScanExecutor {
-        self.executor.as_ref()
-    }
-
-    pub(crate) async fn array(&self) -> VortexResult<&Array> {
+    pub(crate) async fn array(&self, segments: &dyn AsyncSegmentReader) -> VortexResult<&Array> {
         self.array
             .get_or_try_init(async move {
                 let segment_id = self
@@ -59,7 +49,7 @@ impl FlatReader {
                 );
 
                 // Fetch all the array segment.
-                let buffer = self.executor().get_segment(segment_id).await?;
+                let buffer = segments.get(segment_id).await?;
                 let row_count = usize::try_from(self.layout().row_count())
                     .vortex_expect("FlatLayout row count does not fit within usize");
 

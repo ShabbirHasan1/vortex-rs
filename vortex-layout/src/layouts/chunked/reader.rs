@@ -14,7 +14,7 @@ use vortex_mask::Mask;
 use crate::layouts::chunked::stats_table::StatsTable;
 use crate::layouts::chunked::ChunkedLayout;
 use crate::reader::LayoutReader;
-use crate::scan::ScanExecutor;
+use crate::segments::AsyncSegmentReader;
 use crate::{ExprEvaluator, Layout, LayoutVTable, RowMask};
 
 type PruningCache = Arc<OnceCell<Option<Mask>>>;
@@ -23,7 +23,6 @@ type PruningCache = Arc<OnceCell<Option<Mask>>>;
 pub struct ChunkedReader {
     layout: Layout,
     ctx: ContextRef,
-    executor: Arc<ScanExecutor>,
 
     /// A cache of expr -> optional pruning result (applying the pruning expr to the stats table)
     pruning_result: Arc<RwLock<HashMap<ExprRef, PruningCache>>>,
@@ -36,11 +35,7 @@ pub struct ChunkedReader {
 }
 
 impl ChunkedReader {
-    pub(super) fn try_new(
-        layout: Layout,
-        ctx: ContextRef,
-        executor: Arc<ScanExecutor>,
-    ) -> VortexResult<Self> {
+    pub(super) fn try_new(layout: Layout, ctx: ContextRef) -> VortexResult<Self> {
         if layout.encoding().id() != ChunkedLayout.id() {
             vortex_panic!("Mismatched layout ID")
         }
@@ -71,7 +66,6 @@ impl ChunkedReader {
         Ok(Self {
             layout,
             ctx,
-            executor,
             pruning_result: Arc::new(RwLock::new(HashMap::new())),
             stats_table: Arc::new(OnceCell::new()),
             chunk_readers,
@@ -83,7 +77,10 @@ impl ChunkedReader {
     ///
     /// Only the first successful caller will initialize the stats table, all other callers will
     /// resolve to the same result.
-    pub(crate) async fn stats_table(&self) -> VortexResult<Option<&StatsTable>> {
+    pub(crate) async fn stats_table(
+        &self,
+        segments: &dyn AsyncSegmentReader,
+    ) -> VortexResult<Option<&StatsTable>> {
         self.stats_table
             .get_or_try_init(async {
                 Ok(match self.layout.metadata() {
@@ -101,8 +98,9 @@ impl ChunkedReader {
                         let stats_layout = self.layout.child(nchunks, stats_dtype.clone(), "stats")?;
 
                         let stats_array = stats_layout
-                            .reader(self.executor.clone(), self.ctx.clone())?
+                            .reader(self.ctx.clone())?
                             .evaluate_expr(
+                                segments,
                                 RowMask::new_valid_between(0, nchunks as u64),
                                 Identity::new_expr(),
                             )
@@ -125,7 +123,11 @@ impl ChunkedReader {
     }
 
     /// Returns a pruning mask where `true` means the chunk _can be pruned_.
-    pub(crate) async fn pruning_mask(&self, expr: &ExprRef) -> VortexResult<Option<Mask>> {
+    pub(crate) async fn pruning_mask(
+        &self,
+        segments: &dyn AsyncSegmentReader,
+        expr: &ExprRef,
+    ) -> VortexResult<Option<Mask>> {
         let cell = self
             .pruning_result
             .write()
@@ -139,18 +141,20 @@ impl ChunkedReader {
             if let Some(p) = &pruning_predicate {
                 log::debug!("Constructed pruning predicate for expr: {}: {}", expr, p);
             }
-            Ok(if let Some(stats_table) = self.stats_table().await? {
-                if let Some(predicate) = pruning_predicate {
-                    predicate
-                        .evaluate(stats_table.array())?
-                        .map(Mask::try_from)
-                        .transpose()?
+            Ok(
+                if let Some(stats_table) = self.stats_table(segments).await? {
+                    if let Some(predicate) = pruning_predicate {
+                        predicate
+                            .evaluate(stats_table.array())?
+                            .map(Mask::try_from)
+                            .transpose()?
+                    } else {
+                        None
+                    }
                 } else {
                     None
-                }
-            } else {
-                None
-            })
+                },
+            )
         })
         .await
         .cloned()
@@ -162,7 +166,7 @@ impl ChunkedReader {
             let child_layout =
                 self.layout
                     .child(idx, self.layout.dtype().clone(), format!("[{}]", idx))?;
-            child_layout.reader(self.executor.clone(), self.ctx.clone())
+            child_layout.reader(self.ctx.clone())
         })
     }
 

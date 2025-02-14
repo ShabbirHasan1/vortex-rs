@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::{stream, Stream};
 use itertools::Itertools;
@@ -234,6 +235,13 @@ impl ScanExecutor {
     }
 }
 
+#[async_trait]
+impl AsyncSegmentReader for Arc<ScanExecutor> {
+    async fn get(&self, id: SegmentId) -> VortexResult<ByteBuffer> {
+        self.get_segment(id).await
+    }
+}
+
 pub struct Scan<D> {
     driver: D,
     task_executor: Arc<dyn TaskExecutor>,
@@ -254,13 +262,21 @@ impl<D: ScanDriver> Scan<D> {
     /// The returned stream should be considered to perform I/O-bound operations and requires
     /// frequent polling to make progress.
     pub fn into_array_stream(self) -> VortexResult<impl ArrayStream + 'static> {
+        // If we make the I/O stream return SegmentResponse, we can update our internal state
+        // and use it to spawn new compute.
+
+        // For each row mask, we store a state machine.
+        // For each segment we store a state machine (hash map).
+        // The row mask state machine tries to run a filter.
+        //   Layout returns either segment IDs, or a filter mask.
+        // For each segment ID, we store which returned segment IDs are
+
         // Create a single LayoutReader that is reused for the entire scan.
         let executor = Arc::new(ScanExecutor {
             segment_reader: self.driver.segment_reader(),
             task_executor: self.task_executor.clone(),
         });
-        let reader: Arc<dyn LayoutReader> =
-            self.layout.reader(executor.clone(), self.ctx.clone())?;
+        let reader: Arc<dyn LayoutReader> = self.layout.reader(self.ctx.clone())?;
 
         // We start with a stream of row masks
         let row_masks = stream::iter(self.row_masks);
@@ -268,6 +284,7 @@ impl<D: ScanDriver> Scan<D> {
         // If we have a filter expression, we set up a filter stream
         let row_masks: BoxStream<'static, VortexResult<RowMask>> =
             if let Some(filter) = self.filter.clone() {
+                let executor = executor.clone();
                 let reader = reader.clone();
 
                 let pruning = Arc::new(FilterExpr::try_new(
@@ -283,6 +300,7 @@ impl<D: ScanDriver> Scan<D> {
 
                 row_masks
                     .map(move |row_mask| {
+                        let executor = executor.clone();
                         let reader = reader.clone();
                         let filter = filter.clone();
                         let pruning = pruning.clone();
@@ -294,7 +312,12 @@ impl<D: ScanDriver> Scan<D> {
                             row_mask.end(),
                             row_mask.filter_mask().density()
                         );
-                        async move { pruning.new_evaluation(&row_mask).evaluate(reader).await }
+                        async move {
+                            pruning
+                                .new_evaluation(&row_mask)
+                                .evaluate(&executor, reader)
+                                .await
+                        }
                     })
                     // Instead of buffering, we should be smarter where we poll the stream until
                     // the I/O queue has ~256MB of requests in it. Our working set size.
@@ -319,7 +342,9 @@ impl<D: ScanDriver> Scan<D> {
                 let executor = executor.clone();
                 async move {
                     let row_mask = row_mask?;
-                    let mut array = reader.evaluate_expr(row_mask, projection).await?;
+                    let mut array = reader
+                        .evaluate_expr(&executor, row_mask, projection)
+                        .await?;
                     if self.canonicalize {
                         array = executor.evaluate(&array, &[ScanTask::Canonicalize]).await?;
                     }

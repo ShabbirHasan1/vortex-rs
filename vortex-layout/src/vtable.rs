@@ -7,7 +7,6 @@ use vortex_array::ContextRef;
 use vortex_dtype::FieldMask;
 use vortex_error::VortexResult;
 
-use crate::scan::ScanExecutor;
 use crate::{Layout, LayoutId, LayoutReader};
 
 /// A reference to a layout VTable, either static or arc'd.
@@ -48,12 +47,7 @@ pub trait LayoutVTable: Debug + Send + Sync {
     /// Construct a [`LayoutReader`] for the provided [`Layout`].
     ///
     /// May panic if the provided `Layout` is not the same encoding as this `LayoutEncoding`.
-    fn reader(
-        &self,
-        layout: Layout,
-        ctx: ContextRef,
-        executor: Arc<ScanExecutor>,
-    ) -> VortexResult<Arc<dyn LayoutReader>>;
+    fn reader(&self, layout: Layout, ctx: ContextRef) -> VortexResult<Arc<dyn LayoutReader>>;
 
     /// Register the row splits for this layout, these represent natural boundaries at which
     /// a reader can split the layout for independent processing.

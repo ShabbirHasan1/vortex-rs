@@ -14,18 +14,24 @@ use vortex_scalar::Scalar;
 
 use crate::layouts::chunked::reader::ChunkedReader;
 use crate::reader::LayoutReaderExt;
+use crate::segments::AsyncSegmentReader;
 use crate::{ExprEvaluator, RowMask};
 
 #[async_trait]
 impl ExprEvaluator for ChunkedReader {
-    async fn evaluate_expr(self: &Self, row_mask: RowMask, expr: ExprRef) -> VortexResult<Array> {
+    async fn evaluate_expr(
+        &self,
+        segments: &dyn AsyncSegmentReader,
+        row_mask: RowMask,
+        expr: ExprRef,
+    ) -> VortexResult<Array> {
         // Compute the result dtype of the expression.
         let dtype = expr.return_dtype(self.dtype())?;
 
         // If the expression is prune-able, it means we're evaluating a boolean. Even for
         // projections, we can short-circuit the evaluation of the expression and use the pruning
         // mask to return a ConstantArray.
-        let pruning_mask = self.pruning_mask(&expr).await?;
+        let pruning_mask = self.pruning_mask(segments, &expr).await?;
 
         // Figure out which chunks intersect the RowMask
         let chunk_range = self.chunk_range(row_mask.begin()..row_mask.end());
@@ -56,7 +62,7 @@ impl ExprEvaluator for ChunkedReader {
 
             // Otherwise, we need to read it. So we set up a mask for the chunk range.
             let chunk_reader = self.child(chunk_idx)?;
-            chunks.push(chunk_reader.evaluate_expr(chunk_mask, expr.clone()));
+            chunks.push(chunk_reader.evaluate_expr(segments, chunk_mask, expr.clone()));
         }
 
         if chunks.len() == 1 {
@@ -72,9 +78,14 @@ impl ExprEvaluator for ChunkedReader {
         Ok(ChunkedArray::try_new_unchecked(chunks, dtype).into_array())
     }
 
-    async fn prune_mask(&self, row_mask: RowMask, expr: ExprRef) -> VortexResult<RowMask> {
+    async fn prune_mask(
+        &self,
+        segments: &dyn AsyncSegmentReader,
+        row_mask: RowMask,
+        expr: ExprRef,
+    ) -> VortexResult<RowMask> {
         // First we need to compute the pruning mask
-        let Some(pruning_mask) = self.pruning_mask(&expr).await? else {
+        let Some(pruning_mask) = self.pruning_mask(segments, &expr).await? else {
             // If there is no pruning mask, then we can't prune anything!
             log::debug!(
                 "Cannot prune {} in chunked reader, returning mask {}",
@@ -142,8 +153,6 @@ impl ChunkedReader {
 
 #[cfg(test)]
 mod test {
-    use std::sync::Arc;
-
     use futures::executor::block_on;
     use vortex_array::array::{BoolArray, ChunkedArray, ConstantArray};
     use vortex_array::{IntoArray, IntoArrayVariant};
@@ -154,13 +163,12 @@ mod test {
     use vortex_expr::{gt, lit, Identity};
 
     use crate::layouts::chunked::writer::ChunkedLayoutWriter;
-    use crate::scan::ScanExecutor;
     use crate::segments::test::TestSegments;
     use crate::writer::LayoutWriterExt;
     use crate::{Layout, RowMask};
 
     /// Create a chunked layout with three chunks of primitive arrays.
-    fn chunked_layout() -> (Arc<ScanExecutor>, Layout) {
+    fn chunked_layout() -> (TestSegments, Layout) {
         let mut segments = TestSegments::default();
         let layout = ChunkedLayoutWriter::new(
             &DType::Primitive(PType::I32, NonNullable),
@@ -175,7 +183,7 @@ mod test {
             ],
         )
         .unwrap();
-        (ScanExecutor::inline(Arc::new(segments)), layout)
+        (segments, layout)
     }
 
     #[test]
@@ -184,9 +192,10 @@ mod test {
             let (segments, layout) = chunked_layout();
 
             let result = layout
-                .reader(segments, Default::default())
+                .reader(Default::default())
                 .unwrap()
                 .evaluate_expr(
+                    &segments,
                     RowMask::new_valid_between(0, layout.row_count()),
                     Identity::new_expr(),
                 )
@@ -205,13 +214,17 @@ mod test {
         block_on(async {
             let (segments, layout) = chunked_layout();
             let row_count = layout.row_count();
-            let reader = layout.reader(segments, Default::default()).unwrap();
+            let reader = layout.reader(Default::default()).unwrap();
 
             // Choose a prune-able expression
             let expr = gt(Identity::new_expr(), lit(7));
 
             let result = reader
-                .evaluate_expr(RowMask::new_valid_between(0, row_count), expr.clone())
+                .evaluate_expr(
+                    &segments,
+                    RowMask::new_valid_between(0, row_count),
+                    expr.clone(),
+                )
                 .await
                 .unwrap();
             let result = ChunkedArray::try_from(result).unwrap();
