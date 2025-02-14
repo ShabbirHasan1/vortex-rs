@@ -145,3 +145,80 @@ fn take_views_unchecked<I: AsPrimitive<usize>>(
             .map(|i| unsafe { *views_ref.get_unchecked(i.as_()) }),
     )
 }
+
+pub fn map_views(iter: impl IntoIterator<Item = BinaryView>, offset: u32) -> Vec<BinaryView> {
+    iter.into_iter()
+        .map(|view| {
+            if view.is_inlined() {
+                view
+            } else {
+                // Referencing views must have their buffer_index adjusted with new offsets
+                let view_ref = view.as_view();
+                BinaryView::new_view(
+                    view_ref.size(),
+                    *view_ref.prefix(),
+                    offset + view_ref.buffer_index(),
+                    view_ref.offset(),
+                )
+            }
+        })
+        .collect()
+}
+
+pub fn map_views_crazy(iter: impl IntoIterator<Item = BinaryView>, offset: u32) -> Vec<BinaryView> {
+    iter.into_iter()
+        .map(|view| {
+            let value = view.as_u128();
+
+            let block = ((value >> 64) & 0xFFFFFFFF) as u32;
+            let block = if view.is_inlined() {
+                block
+            } else {
+                block + offset
+            };
+            // println!("b {:b}", value & 0xFFFF_FFFF_0000_0000_FFFF_FFFF_FFFF_FFFF);
+            let v = (value & 0xFFFF_FFFF_0000_0000_FFFF_FFFF_FFFF_FFFF) | ((block as u128) << 64);
+            BinaryView::from(v)
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+
+    use itertools::Itertools;
+    use rand::prelude::StdRng;
+    use rand::{Rng, SeedableRng};
+
+    use crate::array::{map_views, map_views_crazy, BinaryView};
+
+    #[test]
+    fn test_q_view_swap() {
+        let mut rng = StdRng::seed_from_u64(23324);
+
+        let views = (0..2000000)
+            .map(|_| {
+                if rng.gen_bool(0.5) {
+                    BinaryView::new_inlined(&[])
+                } else {
+                    BinaryView::new_view(
+                        rng.gen_range(0..1000),
+                        [0u8; 4],
+                        10,
+                        rng.gen_range(0..1000),
+                    )
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let buffers_offset = 10;
+
+        let res2 = map_views(views.clone(), buffers_offset);
+        let res = map_views_crazy(views.clone(), buffers_offset);
+
+        assert_eq!(
+            res2.iter().map(|r| r.as_u128()).collect_vec(),
+            res.iter().map(|r| r.as_u128()).collect_vec()
+        )
+    }
+}

@@ -3,6 +3,7 @@ mod min_max;
 mod take;
 mod to_arrow;
 
+pub use take::{map_views, map_views_crazy};
 use vortex_error::VortexResult;
 use vortex_scalar::Scalar;
 

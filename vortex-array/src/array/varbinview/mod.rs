@@ -6,6 +6,7 @@ use arrow_array::builder::{BinaryViewBuilder, GenericByteViewBuilder, StringView
 use arrow_array::types::{BinaryViewType, ByteViewType, StringViewType};
 use arrow_array::{ArrayRef, BinaryViewArray, GenericByteViewArray, StringViewArray};
 use arrow_buffer::ScalarBuffer;
+pub use compute::{map_views, map_views_crazy};
 use static_assertions::{assert_eq_align, assert_eq_size};
 use vortex_buffer::{Alignment, Buffer, ByteBuffer};
 use vortex_dtype::DType;
@@ -71,6 +72,11 @@ impl Ref {
             buffer_index,
             offset,
         }
+    }
+
+    #[inline]
+    pub fn size(&self) -> u32 {
+        self.size
     }
 
     #[inline]
@@ -186,6 +192,7 @@ impl Debug for BinaryView {
             s.field("inline", &"i".to_string());
         } else {
             s.field("ref", &"r".to_string());
+            s.field("inner", self.as_view());
         }
         s.finish()
     }
