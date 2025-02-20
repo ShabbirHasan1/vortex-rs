@@ -53,3 +53,7 @@ harness = false
 name = "canonicalize_bench"
 harness = false
 required-features = ["test-harness"]
+
+[[bench]]
+name = "primitive_iterator"
+harness = false

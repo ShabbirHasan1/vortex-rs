@@ -19,6 +19,7 @@ use vortex_dtype::{match_each_integer_ptype_with_unsigned_type, DType, NativePTy
 use vortex_error::{vortex_bail, vortex_err, VortexExpect as _, VortexResult};
 use vortex_mask::Mask;
 
+mod accessor;
 mod compress;
 mod compute;
 

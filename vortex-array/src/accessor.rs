@@ -15,3 +15,10 @@ pub trait ArrayAccessor<Item: ?Sized>: Deref<Target = Array> {
     where
         F: for<'a> FnOnce(&mut dyn Iterator<Item = Option<&'a Item>>) -> R;
 }
+
+// 2048??
+pub trait ArrayValueIterator<const BLOCK_SIZE: usize = 2048> {
+    type Item;
+
+    fn next(&mut self) -> Option<Result<&[Self::Item; BLOCK_SIZE], &[Self::Item]>>;
+}
