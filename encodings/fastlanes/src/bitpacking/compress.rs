@@ -10,13 +10,48 @@ use vortex_array::variants::PrimitiveArrayTrait;
 use vortex_array::IntoArray;
 use vortex_buffer::{Buffer, BufferMut, ByteBuffer};
 use vortex_dtype::{
-    match_each_integer_ptype, match_each_integer_ptype_with_unsigned_type,
-    match_each_unsigned_integer_ptype, NativePType, PType,
+    match_each_integer_ptype, match_each_unsigned_integer_ptype, NativePType, PType,
 };
 use vortex_error::{vortex_bail, vortex_err, VortexExpect, VortexResult};
 use vortex_scalar::Scalar;
 
 use crate::BitPackedArray;
+
+pub trait UnsignedBitPacking {
+    type UnsignedT: NativePType;
+}
+
+impl UnsignedBitPacking for u8 {
+    type UnsignedT = u8;
+}
+
+impl UnsignedBitPacking for u16 {
+    type UnsignedT = u16;
+}
+
+impl UnsignedBitPacking for u32 {
+    type UnsignedT = u32;
+}
+
+impl UnsignedBitPacking for u64 {
+    type UnsignedT = u64;
+}
+
+impl UnsignedBitPacking for i8 {
+    type UnsignedT = u8;
+}
+
+impl UnsignedBitPacking for i16 {
+    type UnsignedT = u16;
+}
+
+impl UnsignedBitPacking for i32 {
+    type UnsignedT = u32;
+}
+
+impl UnsignedBitPacking for i64 {
+    type UnsignedT = u64;
+}
 
 pub fn bitpack_to_best_bit_width(array: PrimitiveArray) -> VortexResult<BitPackedArray> {
     let best_bit_width = find_best_bit_width(&array)?;
@@ -203,18 +238,21 @@ pub fn gather_patches(
 }
 
 pub fn unpack(array: BitPackedArray) -> VortexResult<PrimitiveArray> {
-    match_each_integer_ptype_with_unsigned_type!(array.ptype(), |$P, $UnsignedT| {
-        unpack_primitive::<$P, $UnsignedT>(array)
+    match_each_integer_ptype!(array.ptype(), |$P| {
+        unpack_primitive::<$P>(array)
     })
 }
 
-pub fn unpack_primitive<T: NativePType, UnsignedT: NativePType + BitPacking>(
+pub fn unpack_primitive<T: NativePType + UnsignedBitPacking>(
     array: BitPackedArray,
-) -> VortexResult<PrimitiveArray> {
+) -> VortexResult<PrimitiveArray>
+where
+    T::UnsignedT: BitPacking,
+{
     let n = array.len();
     let mut builder = PrimitiveBuilder::with_capacity(array.dtype().nullability(), array.len());
-    assert!(size_of::<T>() == size_of::<UnsignedT>());
-    unpack_into::<T, UnsignedT, _, _>(
+    assert!(size_of::<T>() == size_of::<T::UnsignedT>());
+    unpack_into::<T, _, _>(
         array,
         &mut builder,
         // SAFETY: UnsignedT is the unsigned verison of T, reinterpreting &[UnsignedT] to
@@ -228,7 +266,7 @@ pub fn unpack_primitive<T: NativePType, UnsignedT: NativePType + BitPacking>(
     Ok(builder.finish_into_primitive())
 }
 
-pub(crate) fn unpack_into<T: NativePType, UnsignedT: NativePType + BitPacking, F, G>(
+pub(crate) fn unpack_into<T: NativePType + UnsignedBitPacking, F, G>(
     array: BitPackedArray,
     // TODO(ngates): do we want to use fastlanes alignment for this buffer?
     builder: &mut PrimitiveBuilder<T>,
@@ -236,8 +274,9 @@ pub(crate) fn unpack_into<T: NativePType, UnsignedT: NativePType + BitPacking, F
     transmute_mut: G,
 ) -> VortexResult<()>
 where
-    F: Fn(&[UnsignedT]) -> &[T],
-    G: Fn(&mut [T]) -> &mut [UnsignedT],
+    T::UnsignedT: BitPacking,
+    F: Fn(&[T::UnsignedT]) -> &[T],
+    G: Fn(&mut [T]) -> &mut [T::UnsignedT],
 {
     let my_offset_in_builder = builder.len();
 
@@ -245,7 +284,7 @@ where
         .nulls
         .append_validity(array.validity(), array.len())?;
 
-    let packed = array.packed_slice::<UnsignedT>();
+    let packed = array.packed_slice::<T::UnsignedT>();
     let bit_width = array.bit_width() as usize;
     let length = array.len();
     let offset = array.offset() as usize;

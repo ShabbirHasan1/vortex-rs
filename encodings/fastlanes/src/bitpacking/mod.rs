@@ -15,7 +15,7 @@ use vortex_array::vtable::{
 };
 use vortex_array::{encoding_ids, impl_encoding, Array, Canonical, RkyvMetadata};
 use vortex_buffer::ByteBuffer;
-use vortex_dtype::{match_each_integer_ptype_with_unsigned_type, DType, NativePType, PType};
+use vortex_dtype::{match_each_integer_ptype, DType, NativePType, PType};
 use vortex_error::{vortex_bail, vortex_err, VortexExpect as _, VortexResult};
 use vortex_mask::Mask;
 
@@ -265,8 +265,8 @@ impl CanonicalVTable<BitPackedArray> for BitPackedEncoding {
         array: BitPackedArray,
         builder: &mut dyn ArrayBuilder,
     ) -> VortexResult<()> {
-        match_each_integer_ptype_with_unsigned_type!(array.ptype(), |$T, $UnsignedT| {
-            unpack_into::<$T, $UnsignedT, _, _>(
+        match_each_integer_ptype!(array.ptype(), |$T| {
+            unpack_into::<$T, _, _>(
                 array,
                 builder
                     .as_any_mut()

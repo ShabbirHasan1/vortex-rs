@@ -1,20 +1,20 @@
 use std::marker::PhantomData;
 
 use fastlanes::BitPacking;
+use num_traits::Zero;
 use vortex_array::accessor::ArrayValueIterator;
 use vortex_dtype::NativePType;
 
-use crate::BitPackedArray;
+use crate::{BitPackedArray, UnsignedBitPacking};
 
 impl BitPackedArray {
-    pub fn iter_blocks<
-        'a,
-        T: NativePType,
-        UnsignedT: NativePType + BitPacking,
-        const BLOCK_SIZE: usize,
-    >(
+    pub fn iter_blocks<'a, T: NativePType + UnsignedBitPacking, const BLOCK_SIZE: usize>(
         &'a self,
-    ) -> BitPackedArrayBlockIter<'a, T, UnsignedT, BLOCK_SIZE> {
+    ) -> BitPackedArrayBlockIter<'a, T, BLOCK_SIZE>
+    where
+        T: NativePType + UnsignedBitPacking,
+        T::UnsignedT: BitPacking,
+    {
         let last_chunk_len = (self.offset() as usize + self.len()) % 1024;
 
         let bit_width = self.bit_width() as usize;
@@ -34,40 +34,37 @@ impl BitPackedArray {
         // );
         // let elems_per_chunk = 128 * bit_width / size_of::<T>();
 
-        BitPackedArrayBlockIter::<'a, T, UnsignedT, BLOCK_SIZE> {
-            packed_slice: self.packed_slice::<UnsignedT>(),
+        BitPackedArrayBlockIter::<'a, T, BLOCK_SIZE> {
+            packed_slice: self.packed_slice::<T::UnsignedT>(),
             block_id: 0,
             full_block_count: num_chunks - last_chunk_is_sliced as usize,
             block_count: num_chunks,
             last_chunk_len,
             offset: self.offset() as usize,
             bit_width,
-            fixed_array: [UnsignedT::zero(); BLOCK_SIZE],
+            fixed_array: [T::UnsignedT::zero(); BLOCK_SIZE],
             _ph: PhantomData::default(),
         }
     }
 }
 
 impl BitPackedArray {
-    pub fn dyn_iter_blocks<
-        'a,
-        T: NativePType,
-        UnsignedT: NativePType + BitPacking,
-        const BLOCK_SIZE: usize,
-    >(
+    pub fn dyn_iter_blocks<'a, T, const BLOCK_SIZE: usize>(
         &'a self,
-    ) -> Box<dyn ArrayValueIterator<BLOCK_SIZE, Item = T> + 'a> {
-        Box::from(self.iter_blocks::<T, UnsignedT, BLOCK_SIZE>())
+    ) -> Box<dyn ArrayValueIterator<BLOCK_SIZE, Item = T> + 'a>
+    where
+        T: NativePType + UnsignedBitPacking,
+        T::UnsignedT: BitPacking,
+    {
+        Box::from(self.iter_blocks::<T, BLOCK_SIZE>())
     }
 }
 
-pub struct BitPackedArrayBlockIter<
-    'a,
-    T,
-    UnsignedT: NativePType + BitPacking,
-    const BLOCK_SIZE: usize,
-> {
-    packed_slice: &'a [UnsignedT],
+pub struct BitPackedArrayBlockIter<'a, T, const BLOCK_SIZE: usize>
+where
+    T: UnsignedBitPacking,
+{
+    packed_slice: &'a [T::UnsignedT],
     block_id: usize,
     block_count: usize,
     full_block_count: usize,
@@ -75,12 +72,15 @@ pub struct BitPackedArrayBlockIter<
     bit_width: usize,
     offset: usize,
     //  TODO(joe):   let mut array: [MaybeUninit<u8>; SIZE] = unsafe { MaybeUninit::uninit().assume_init() };
-    fixed_array: [UnsignedT; BLOCK_SIZE],
+    fixed_array: [T::UnsignedT; BLOCK_SIZE],
     _ph: PhantomData<T>,
 }
 
-impl<'a, T: NativePType, UnsignedT: NativePType + BitPacking, const BLOCK_SIZE: usize>
-    ArrayValueIterator<BLOCK_SIZE> for BitPackedArrayBlockIter<'a, T, UnsignedT, BLOCK_SIZE>
+impl<'a, T, const BLOCK_SIZE: usize> ArrayValueIterator<BLOCK_SIZE>
+    for BitPackedArrayBlockIter<'a, T, BLOCK_SIZE>
+where
+    T: NativePType + UnsignedBitPacking,
+    T::UnsignedT: BitPacking,
 {
     type Item = T;
 
@@ -116,7 +116,9 @@ impl<'a, T: NativePType, UnsignedT: NativePType + BitPacking, const BLOCK_SIZE: 
                 self.block_id += 1;
             }
             Some(Ok(unsafe {
-                std::mem::transmute::<&[UnsignedT; BLOCK_SIZE], &[T; BLOCK_SIZE]>(&self.fixed_array)
+                std::mem::transmute::<&[T::UnsignedT; BLOCK_SIZE], &[T; BLOCK_SIZE]>(
+                    &self.fixed_array,
+                )
             }))
         } else {
             let rest = FL_BLOCK * (self.full_block_count - self.block_id) + self.last_chunk_len;
@@ -154,7 +156,7 @@ mod tests {
         let prim = PrimitiveArray::from_iter(vals);
         let packed = bitpack_encode(prim, 8).unwrap();
 
-        let mut iter = packed.iter_blocks::<i32, u32, 2048>();
+        let mut iter = packed.iter_blocks::<i32, 2048>();
         println!(
             "{:?}",
             iter.next()
@@ -187,7 +189,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut iter = packed.iter_blocks::<i32, u32, 2048>();
+        let mut iter = packed.iter_blocks::<i32, 2048>();
         println!("{:?}", iter.next().unwrap().map_err(|e| (e.len(), e)));
         println!(
             "{:?}",
@@ -212,7 +214,7 @@ mod tests {
             BitPackedArray::maybe_from(slice(&bitpack_encode(prim, 8).unwrap(), 2, 3074).unwrap())
                 .unwrap();
 
-        let mut iter = packed.iter_blocks::<i32, u32, 2048>();
+        let mut iter = packed.iter_blocks::<i32, 2048>();
         println!("{:?}", iter.next().unwrap().map_err(|e| (e.len(), e)));
         println!(
             "{:?}",
