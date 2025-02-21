@@ -16,6 +16,7 @@
 //!   compile-time alignment of `A`.
 //! * `buffer!` and `buffer_mut!` macros with the same syntax as the builtin `vec!` macro for
 //!   inline construction of buffers.
+//! * `BitBuffer` and `BitBufferMut` provide packed bitsets that can be used to store boolean values.
 //!
 //! You can think of `BufferMut<T>` as similar to a `Vec<T>`, except that any operation that may
 //! cause a re-allocation, e.g. extend, will ensure the new allocation maintains the buffer's
@@ -46,6 +47,7 @@
 //! `arrow_buffer::OffsetBuffer`.
 
 pub use alignment::*;
+pub use bit::*;
 pub use buffer::*;
 pub use buffer_mut::*;
 pub use bytes::*;
@@ -55,6 +57,7 @@ pub use string::*;
 mod alignment;
 #[cfg(feature = "arrow")]
 mod arrow;
+mod bit;
 mod buffer;
 mod buffer_mut;
 mod bytes;
