@@ -5,12 +5,12 @@ fn main() {
 const BENCH_ARGS: &[usize] = &[
     // 2 << 10,
     // 2 << 12,
-    2 << 14,
-    2 << 16,
+    // 2 << 14,
+    // 2 << 16,
     2 << 18,
     2 << 20,
-    2 << 22,
-    2 << 24,
+    // 2 << 22,
+    // 2 << 24,
     // 2 << 26,
 ];
 
@@ -122,9 +122,36 @@ mod bitpacked {
     use vortex_array::arrays::PrimitiveArray;
     use vortex_array::compute::slice;
     use vortex_array::IntoArrayVariant;
+    use vortex_dtype::NativePType;
     use vortex_fastlanes::{bitpack_to_best_bit_width, BitPackedArray};
 
     use crate::{BENCH_ARGS, CONST};
+
+    fn unpack_slice<T, const BLOCK_SIZE: usize, I>(values: &[T], mut iter: I)
+    where
+        T: NativePType,
+        I: ArrayValueIterator<BLOCK_SIZE, Item = u32>,
+    {
+        let mut out_block = [T::zero(); BLOCK_SIZE];
+        loop {
+            let n = iter.next();
+            match n {
+                Some(Ok(block)) => {
+                    for i in 0..block.len() {
+                        out_block[i] = values[block[i] as usize];
+                    }
+                    black_box(out_block);
+                }
+                Some(Err(slice)) => {
+                    for i in 0..slice.len() {
+                        out_block[i] = values[slice[i] as usize];
+                    }
+                    black_box(out_block);
+                }
+                None => break,
+            }
+        }
+    }
 
     #[divan::bench(consts=CONST, args=BENCH_ARGS)]
     fn primitive_bp_iter_sum<const BLOCK_SIZE: usize>(bencher: Bencher, args: usize) {
@@ -149,26 +176,10 @@ mod bitpacked {
             .with_inputs(|| array.clone())
             .bench_local_values(|arr| {
                 let values = values.as_slice::<f64>();
-                let mut iter = arr.iter_blocks::<u32, BLOCK_SIZE>();
-                let mut out_block = [0f64; BLOCK_SIZE];
-                loop {
-                    let n = iter.next();
-                    match n {
-                        None => break,
-                        Some(Ok(block)) => {
-                            for i in 0..block.len() {
-                                out_block[i] = values[block[i] as usize];
-                            }
-                            black_box(out_block);
-                        }
-                        Some(Err(slice)) => {
-                            for i in 0..slice.len() {
-                                out_block[i] = values[slice[i] as usize];
-                            }
-                            black_box(out_block);
-                        }
-                    }
-                }
+                black_box(unpack_slice::<f64, BLOCK_SIZE, _>(
+                    values,
+                    arr.iter_blocks(),
+                ))
             })
     }
 
@@ -195,26 +206,10 @@ mod bitpacked {
             .with_inputs(|| array.clone())
             .bench_local_values(|arr| {
                 let values = values.as_slice::<f64>();
-                let mut iter = arr.dyn_iter_blocks::<u32, BLOCK_SIZE>();
-                let mut out_block = [0f64; BLOCK_SIZE];
-                loop {
-                    let n = iter.next();
-                    match n {
-                        None => break,
-                        Some(Ok(block)) => {
-                            for i in 0..block.len() {
-                                out_block[i] = values[block[i] as usize];
-                            }
-                            black_box(out_block);
-                        }
-                        Some(Err(slice)) => {
-                            for i in 0..slice.len() {
-                                out_block[i] = values[slice[i] as usize];
-                            }
-                            black_box(out_block);
-                        }
-                    }
-                }
+                black_box(unpack_slice::<f64, BLOCK_SIZE, _>(
+                    values,
+                    arr.dyn_iter_blocks(),
+                ))
             })
     }
 
@@ -241,14 +236,20 @@ mod bitpacked {
             .with_inputs(|| array.clone())
             .bench_local_values(|arr| {
                 let values = values.as_slice::<f64>();
-                let values_out = arr
+                let _values_out = arr
                     .into_primitive()
                     .unwrap()
                     .as_slice::<u32>()
                     .into_iter()
-                    .map(|x| values[*x as usize])
+                    .map(|x| {
+                        values[*x as usize];
+                    })
                     .collect_vec();
-                black_box(values_out)
+                black_box(_values_out)
+
+                // .for_each(|x| {
+                //     black_box(values[*x as usize]);
+                // });
             })
     }
 }

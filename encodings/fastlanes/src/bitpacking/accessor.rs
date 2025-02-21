@@ -19,6 +19,7 @@ impl BitPackedArray {
 
         let bit_width = self.bit_width() as usize;
         let last_chunk_is_sliced = last_chunk_len > 0;
+        let first_chunk_is_sliced = self.offset() != 0;
 
         let num_chunks = (self.offset() as usize + self.len() + 1023) / 1024;
         // println!(
@@ -38,14 +39,28 @@ impl BitPackedArray {
             packed_slice: self.packed_slice::<T::UnsignedT>(),
             block_id: 0,
             full_block_count: num_chunks - last_chunk_is_sliced as usize,
-            block_count: num_chunks,
+            // block_count: num_chunks,
             last_chunk_len,
             offset: self.offset() as usize,
             bit_width,
             fixed_array: [T::UnsignedT::zero(); BLOCK_SIZE],
             _ph: PhantomData::default(),
+            state: if 0 == num_chunks {
+                BitPackedArrayBlockIterState::Done
+            } else if first_chunk_is_sliced {
+                BitPackedArrayBlockIterState::FirstBlock
+            } else {
+                BitPackedArrayBlockIterState::FullBlock
+            },
         }
     }
+}
+
+enum BitPackedArrayBlockIterState {
+    FirstBlock,
+    FullBlock,
+    LastBlock,
+    Done,
 }
 
 impl BitPackedArray {
@@ -66,7 +81,7 @@ where
 {
     packed_slice: &'a [T::UnsignedT],
     block_id: usize,
-    block_count: usize,
+    // block_count: usize,
     full_block_count: usize,
     last_chunk_len: usize,
     bit_width: usize,
@@ -74,6 +89,7 @@ where
     //  TODO(joe):   let mut array: [MaybeUninit<u8>; SIZE] = unsafe { MaybeUninit::uninit().assume_init() };
     fixed_array: [T::UnsignedT; BLOCK_SIZE],
     _ph: PhantomData<T>,
+    state: BitPackedArrayBlockIterState,
 }
 
 impl<'a, T, const BLOCK_SIZE: usize> ArrayValueIterator<BLOCK_SIZE>
@@ -87,55 +103,124 @@ where
     fn next(&mut self) -> Option<Result<&[T; BLOCK_SIZE], &[T]>> {
         let elems_per_chunk = 128 * self.bit_width / size_of::<T>();
         const FL_BLOCK: usize = 1024;
-        if self.block_id >= self.block_count {
-            return None;
-        }
-        let first_block_is_sliced = self.offset != 0;
-        if self.block_id == 0 && first_block_is_sliced {
-            unsafe {
-                BitPacking::unchecked_unpack(
-                    self.bit_width,
-                    &self.packed_slice[..elems_per_chunk],
-                    &mut self.fixed_array[..FL_BLOCK],
-                )
-            }
-            self.block_id += 1;
-            return Some(Err(unsafe {
-                std::mem::transmute(&self.fixed_array[self.offset..FL_BLOCK])
-            }));
-        }
-        if self.block_id + (BLOCK_SIZE / FL_BLOCK) <= self.full_block_count {
-            for i in (0..BLOCK_SIZE).step_by(FL_BLOCK) {
+
+        match &self.state {
+            BitPackedArrayBlockIterState::FirstBlock => {
+                self.state = BitPackedArrayBlockIterState::FullBlock;
                 unsafe {
                     BitPacking::unchecked_unpack(
                         self.bit_width,
-                        &self.packed_slice[self.block_id * elems_per_chunk..][..elems_per_chunk],
-                        &mut self.fixed_array[i..i + FL_BLOCK],
+                        &self.packed_slice[..elems_per_chunk],
+                        &mut self.fixed_array[..FL_BLOCK],
                     )
                 }
                 self.block_id += 1;
+                Some(Err(unsafe {
+                    std::mem::transmute(&self.fixed_array[self.offset..FL_BLOCK])
+                }))
             }
-            Some(Ok(unsafe {
-                std::mem::transmute::<&[T::UnsignedT; BLOCK_SIZE], &[T; BLOCK_SIZE]>(
-                    &self.fixed_array,
-                )
-            }))
-        } else {
-            let rest = FL_BLOCK * (self.full_block_count - self.block_id) + self.last_chunk_len;
-            for i in (0..rest).step_by(FL_BLOCK) {
-                unsafe {
-                    BitPacking::unchecked_unpack(
-                        self.bit_width,
-                        &self.packed_slice[self.block_id * elems_per_chunk..][..elems_per_chunk],
-                        &mut self.fixed_array[i..i + FL_BLOCK],
-                    )
+            BitPackedArrayBlockIterState::FullBlock => {
+                if self.block_id + (BLOCK_SIZE / FL_BLOCK) > self.full_block_count {
+                    self.state = BitPackedArrayBlockIterState::LastBlock;
+                    return self.next();
                 }
-                self.block_id += 1;
+
+                for i in (0..BLOCK_SIZE).step_by(FL_BLOCK) {
+                    unsafe {
+                        BitPacking::unchecked_unpack(
+                            self.bit_width,
+                            &self.packed_slice[self.block_id * elems_per_chunk..]
+                                [..elems_per_chunk],
+                            &mut self.fixed_array[i..i + FL_BLOCK],
+                        )
+                    }
+                    self.block_id += 1;
+                }
+                //             let ptr = self.as_ptr() as *const [T; N];
+                //
+                //             // SAFETY: The underlying array of a slice can be reinterpreted as an actual array `[T; N]` if `N` is not greater than the slice's length.
+                //             let me = unsafe { &*ptr };
+
+                // std::array::TryFromSliceError
+                Some(Ok(unsafe {
+                    std::mem::transmute::<&[T::UnsignedT; BLOCK_SIZE], &[T; BLOCK_SIZE]>(
+                        &self.fixed_array,
+                    )
+                    // &* self.fixed_array.as_ptr() as *const [T; BLOCK_SIZE],
+                }))
             }
-            Some(Err(unsafe {
-                std::mem::transmute(&self.fixed_array[0..rest])
-            }))
+            BitPackedArrayBlockIterState::LastBlock => {
+                self.state = BitPackedArrayBlockIterState::Done;
+                let rest = FL_BLOCK * (self.full_block_count - self.block_id) + self.last_chunk_len;
+                for i in (0..rest).step_by(FL_BLOCK) {
+                    unsafe {
+                        BitPacking::unchecked_unpack(
+                            self.bit_width,
+                            &self.packed_slice[self.block_id * elems_per_chunk..]
+                                [..elems_per_chunk],
+                            &mut self.fixed_array[i..i + FL_BLOCK],
+                        )
+                    }
+                    self.block_id += 1;
+                }
+                Some(Err(
+                    unsafe { std::mem::transmute(&self.fixed_array[0..rest]) }, // unsafe { std::slice::from_raw_parts(self.fixed_array.as_ptr().cast(), rest) },
+                ))
+            }
+            BitPackedArrayBlockIterState::Done => None,
         }
+
+        // let elems_per_chunk = 128 * self.bit_width / size_of::<T>();
+        // const FL_BLOCK: usize = 1024;
+        // if self.block_id >= self.block_count {
+        //     return None;
+        // }
+        // let first_block_is_sliced = self.offset != 0;
+        // if self.block_id == 0 && first_block_is_sliced {
+        //     unsafe {
+        //         BitPacking::unchecked_unpack(
+        //             self.bit_width,
+        //             &self.packed_slice[..elems_per_chunk],
+        //             &mut self.fixed_array[..FL_BLOCK],
+        //         )
+        //     }
+        //     self.block_id += 1;
+        //     return Some(Err(unsafe {
+        //         std::mem::transmute(&self.fixed_array[self.offset..FL_BLOCK])
+        //     }));
+        // }
+        // if self.block_id + (BLOCK_SIZE / FL_BLOCK) <= self.full_block_count {
+        //     for i in (0..BLOCK_SIZE).step_by(FL_BLOCK) {
+        //         unsafe {
+        //             BitPacking::unchecked_unpack(
+        //                 self.bit_width,
+        //                 &self.packed_slice[self.block_id * elems_per_chunk..][..elems_per_chunk],
+        //                 &mut self.fixed_array[i..i + FL_BLOCK],
+        //             )
+        //         }
+        //         self.block_id += 1;
+        //     }
+        //     Some(Ok(unsafe {
+        //         std::mem::transmute::<&[T::UnsignedT; BLOCK_SIZE], &[T; BLOCK_SIZE]>(
+        //             &self.fixed_array,
+        //         )
+        //     }))
+        // } else {
+        //     let rest = FL_BLOCK * (self.full_block_count - self.block_id) + self.last_chunk_len;
+        //     for i in (0..rest).step_by(FL_BLOCK) {
+        //         unsafe {
+        //             BitPacking::unchecked_unpack(
+        //                 self.bit_width,
+        //                 &self.packed_slice[self.block_id * elems_per_chunk..][..elems_per_chunk],
+        //                 &mut self.fixed_array[i..i + FL_BLOCK],
+        //             )
+        //         }
+        //         self.block_id += 1;
+        //     }
+        //     Some(Err(unsafe {
+        //         std::mem::transmute(&self.fixed_array[0..rest])
+        //     }))
+        // }
     }
 }
 

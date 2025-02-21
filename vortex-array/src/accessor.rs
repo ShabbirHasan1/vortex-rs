@@ -22,3 +22,14 @@ pub trait ArrayValueIterator<const BLOCK_SIZE: usize = 2048> {
 
     fn next(&mut self) -> Option<Result<&[Self::Item; BLOCK_SIZE], &[Self::Item]>>;
 }
+
+impl<I, const BLOCK_SIZE: usize> ArrayValueIterator<BLOCK_SIZE> for Box<I>
+where
+    I: ArrayValueIterator<BLOCK_SIZE> + ?Sized,
+{
+    type Item = I::Item;
+
+    fn next(&mut self) -> Option<Result<&[Self::Item; BLOCK_SIZE], &[Self::Item]>> {
+        self.as_mut().next()
+    }
+}
