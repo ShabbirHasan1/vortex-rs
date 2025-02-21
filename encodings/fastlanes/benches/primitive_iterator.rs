@@ -1,6 +1,11 @@
+use mimalloc::MiMalloc;
+
 fn main() {
     divan::main();
 }
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 const BENCH_ARGS: &[usize] = &[
     // 2 << 10,
