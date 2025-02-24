@@ -98,6 +98,7 @@ mod memory;
 mod open;
 pub mod segments;
 mod strategy;
+mod streaming;
 #[cfg(test)]
 mod tests;
 mod writer;

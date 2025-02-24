@@ -5,7 +5,6 @@ use flatbuffers::root;
 use futures::stream::FuturesUnordered;
 use futures::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
-use moka::future::CacheBuilder;
 use vortex_array::stats::StatsSet;
 use vortex_array::ContextRef;
 use vortex_buffer::{Alignment, ByteBuffer, ByteBufferMut};
@@ -20,11 +19,8 @@ use vortex_metrics::VortexMetrics;
 use vortex_sampling_compressor::ALL_ENCODINGS_CONTEXT;
 
 use crate::footer::{FileLayout, Postscript, Segment};
-use crate::segments::{InMemorySegmentCache, NoOpSegmentCache, SegmentCache};
-use crate::{
-    GenericVortexFile, InMemoryVortexFile, VortexFile, EOF_SIZE, MAGIC_BYTES, MAX_FOOTER_SIZE,
-    VERSION,
-};
+use crate::segments::{NoOpSegmentCache, SegmentCache};
+use crate::{VortexFile, EOF_SIZE, MAGIC_BYTES, MAX_FOOTER_SIZE, VERSION};
 
 pub trait FileType: Sized {
     type Options: Clone;
@@ -43,24 +39,39 @@ pub trait FileType: Sized {
 /// Open options for a Vortex file reader.
 pub struct VortexOpenOptions<F: FileType> {
     /// The underlying file reader.
-    read: F::Read,
+    pub(crate) read: F::Read,
     /// File-specific options
     pub(crate) options: F::Options,
     /// The Vortex Array encoding context.
-    ctx: ContextRef,
+    pub(crate) ctx: ContextRef,
     /// The Vortex Layout encoding context.
-    layout_ctx: LayoutContextRef,
+    pub(crate) layout_ctx: LayoutContextRef,
     /// An optional, externally provided, file size.
-    file_size: Option<u64>,
+    pub(crate) file_size: Option<u64>,
     /// An optional, externally provided, file layout.
     // TODO(ngates): add an optional DType so we only read the layout segment.
-    file_layout: Option<FileLayout>,
-    segment_cache: Arc<dyn SegmentCache>,
-    initial_read_size: u64,
-    metrics: VortexMetrics,
+    pub(crate) file_layout: Option<FileLayout>,
+    pub(crate) segment_cache: Arc<dyn SegmentCache>,
+    pub(crate) initial_read_size: u64,
+    pub(crate) metrics: VortexMetrics,
 }
 
 impl<F: FileType> VortexOpenOptions<F> {
+    /// Create a new Vortex file open options.
+    pub(crate) fn new(read: F::Read, options: F::Options) -> Self {
+        Self {
+            read,
+            options,
+            ctx: ALL_ENCODINGS_CONTEXT.clone(),
+            layout_ctx: Arc::new(Default::default()),
+            file_size: None,
+            file_layout: None,
+            segment_cache: Arc::new(NoOpSegmentCache),
+            initial_read_size: 0,
+            metrics: VortexMetrics::default(),
+        }
+    }
+
     /// Configure a Vortex Array context.
     pub fn with_ctx(mut self, ctx: ContextRef) -> Self {
         self.ctx = ctx;
@@ -92,12 +103,9 @@ impl<F: FileType> VortexOpenOptions<F> {
     }
 
     /// Configure the initial read size for the Vortex file.
-    pub fn with_initial_read_size(mut self, initial_read_size: u64) -> VortexResult<Self> {
-        if self.initial_read_size < u16::MAX as u64 {
-            vortex_bail!("initial_read_size must be at least u16::MAX");
-        }
+    pub fn with_initial_read_size(mut self, initial_read_size: u64) -> Self {
         self.initial_read_size = initial_read_size;
-        Ok(self)
+        self
     }
 
     /// Configure a custom [`SegmentCache`].
@@ -115,45 +123,6 @@ impl<F: FileType> VortexOpenOptions<F> {
     pub fn with_metrics(mut self, metrics: VortexMetrics) -> Self {
         self.metrics = metrics;
         self
-    }
-}
-
-impl VortexOpenOptions<InMemoryVortexFile> {
-    /// Open an in-memory file contained in the provided buffer.
-    pub fn in_memory<B: Into<ByteBuffer>>(buffer: B) -> Self {
-        Self {
-            read: buffer.into(),
-            options: (),
-            ctx: ALL_ENCODINGS_CONTEXT.clone(),
-            layout_ctx: Arc::new(Default::default()),
-            file_size: None,
-            file_layout: None,
-            segment_cache: Arc::new(NoOpSegmentCache),
-            initial_read_size: 0,
-            metrics: VortexMetrics::default(),
-        }
-    }
-}
-
-impl<R: VortexReadAt> VortexOpenOptions<GenericVortexFile<R>> {
-    const INITIAL_READ_SIZE: u64 = 1 << 20; // 1 MB
-
-    pub fn file(read: R) -> Self {
-        Self {
-            read,
-            // TODO(ngates): move this context into the vortex-file crate
-            options: Default::default(),
-            ctx: ALL_ENCODINGS_CONTEXT.clone(),
-            layout_ctx: LayoutContextRef::default(),
-            file_size: None,
-            file_layout: None,
-            segment_cache: Arc::new(InMemorySegmentCache::new(
-                // For now, use a fixed 1GB overhead.
-                CacheBuilder::new(1 << 30),
-            )),
-            initial_read_size: Self::INITIAL_READ_SIZE,
-            metrics: VortexMetrics::default(),
-        }
     }
 }
 

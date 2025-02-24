@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use futures::stream::FuturesUnordered;
 use futures::{stream, Stream, StreamExt, TryStreamExt};
+use moka::future::CacheBuilder;
 use vortex_buffer::{Alignment, ByteBuffer};
 use vortex_error::{vortex_err, vortex_panic, VortexExpect, VortexResult};
 use vortex_io::VortexReadAt;
@@ -14,13 +15,27 @@ use vortex_metrics::{Counter, VortexMetrics};
 
 use crate::footer::{FileLayout, Segment};
 use crate::segments::channel::SegmentChannel;
-use crate::segments::SegmentCache;
+use crate::segments::{InMemorySegmentCache, SegmentCache};
 use crate::{FileType, VortexOpenOptions};
 
 /// A type of Vortex file that supports any [`VortexReadAt`] implementation.
 ///
 /// This is a reasonable choice for files backed by a network since it performs I/O coalescing.
 pub struct GenericVortexFile<R>(PhantomData<R>);
+
+impl<R: VortexReadAt> VortexOpenOptions<GenericVortexFile<R>> {
+    const INITIAL_READ_SIZE: u64 = 1 << 20; // 1 MB
+
+    pub fn file(read: R) -> Self {
+        Self::new(read, Default::default())
+            // For now, use a fixed 1GB cache.
+            .with_segment_cache(Arc::new(InMemorySegmentCache::new(CacheBuilder::new(
+                1 << 30,
+            ))))
+            // Increase the initial read size to 1MB
+            .with_initial_read_size(Self::INITIAL_READ_SIZE)
+    }
+}
 
 impl<R: VortexReadAt> FileType for GenericVortexFile<R> {
     type Options = GenericScanOptions;

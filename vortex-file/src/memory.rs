@@ -9,7 +9,7 @@ use vortex_layout::segments::{AsyncSegmentReader, SegmentId};
 use vortex_metrics::VortexMetrics;
 
 use crate::segments::SegmentCache;
-use crate::{FileLayout, FileType, Segment};
+use crate::{FileLayout, FileType, Segment, VortexOpenOptions};
 
 /// A Vortex file that is backed by an in-memory buffer.
 ///
@@ -19,6 +19,13 @@ use crate::{FileLayout, FileType, Segment};
 pub struct InMemoryVortexFile {
     buffer: ByteBuffer,
     file_layout: FileLayout,
+}
+
+impl VortexOpenOptions<InMemoryVortexFile> {
+    /// Open an in-memory file contained in the provided buffer.
+    pub fn in_memory<B: Into<ByteBuffer>>(buffer: B) -> Self {
+        Self::new(buffer.into(), ())
+    }
 }
 
 impl FileType for InMemoryVortexFile {
