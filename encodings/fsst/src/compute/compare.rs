@@ -102,7 +102,7 @@ fn compare_fsst_constant(
     };
 
     let rhs = ConstantArray::new(encoded_scalar, left.len());
-    compare(left.codes(), &rhs, operator).map(Some)
+    compare(left.encoded(), &rhs, operator).map(Some)
 }
 
 #[cfg(test)]

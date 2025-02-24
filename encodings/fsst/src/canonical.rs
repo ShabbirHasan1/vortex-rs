@@ -51,7 +51,7 @@ fn fsst_into_varbin_view(
     // To speed up canonicalization, we can decompress the entire string-heap in a single
     // call. We then turn our uncompressed_lengths into an offsets buffer
     // necessary for a VarBinViewArray and construct the canonical array.
-    let bytes = fsst_array.codes().as_::<VarBinArray>().sliced_bytes();
+    let bytes = fsst_array.encoded().as_::<VarBinArray>().sliced_bytes();
 
     let uncompressed_lens_array = fsst_array.uncompressed_lengths().to_primitive()?;
 

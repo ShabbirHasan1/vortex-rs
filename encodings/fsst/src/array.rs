@@ -20,7 +20,7 @@ pub struct FSSTArray {
     dtype: DType,
     symbols: ArrayRef,
     symbol_lengths: ArrayRef,
-    codes: ArrayRef,
+    encoded: ArrayRef,
     uncompressed_lengths: ArrayRef,
     stats_set: Arc<RwLock<StatsSet>>,
 }
@@ -48,7 +48,7 @@ impl FSSTArray {
         dtype: DType,
         symbols: ArrayRef,
         symbol_lengths: ArrayRef,
-        codes: ArrayRef,
+        encoded: ArrayRef,
         uncompressed_lengths: ArrayRef,
     ) -> VortexResult<Self> {
         // Check: symbols must be a u64 array
@@ -68,31 +68,31 @@ impl FSSTArray {
             vortex_bail!(InvalidArgument: "symbols and symbol_lengths arrays must have same length");
         }
 
-        if uncompressed_lengths.len() != codes.len() {
-            vortex_bail!(InvalidArgument: "uncompressed_lengths must be same len as codes");
+        if uncompressed_lengths.len() != encoded.len() {
+            vortex_bail!(InvalidArgument: "uncompressed_lengths must be same len as encoded");
         }
 
         if !uncompressed_lengths.dtype().is_int() || uncompressed_lengths.dtype().is_nullable() {
             vortex_bail!(InvalidArgument: "uncompressed_lengths must have integer type and cannot be nullable, found {}", uncompressed_lengths.dtype());
         }
 
-        if codes.encoding() != VarBinEncoding::ID {
+        if encoded.encoding() != VarBinEncoding::ID {
             vortex_bail!(
                 InvalidArgument: "codes must have varbin encoding, was {}",
-                codes.encoding()
+                encoded.encoding()
             );
         }
 
-        // Check: strings must be a Binary array.
-        if !matches!(codes.dtype(), DType::Binary(_)) {
-            vortex_bail!(InvalidArgument: "codes array must be DType::Binary type");
+        // Check: encoded values must be binary sequence of symbol codes.
+        if !matches!(encoded.dtype(), DType::Binary(_)) {
+            vortex_bail!(InvalidArgument: "encoded array must be DType::Binary type");
         }
 
         Ok(Self {
             dtype,
             symbols,
             symbol_lengths,
-            codes,
+            encoded,
             uncompressed_lengths,
             stats_set: Default::default(),
         })
@@ -108,15 +108,9 @@ impl FSSTArray {
         &self.symbol_lengths
     }
 
-    /// Access the codes array
-    pub fn codes(&self) -> &ArrayRef {
-        &self.codes
-    }
-
-    /// Get the DType of the codes array
-    #[inline]
-    pub fn codes_dtype(&self) -> &DType {
-        self.codes.dtype()
+    /// Access the encoded values array. Each element is a sequence of 8-bit symbol codes.
+    pub fn encoded(&self) -> &ArrayRef {
+        &self.encoded
     }
 
     /// Get the uncompressed length for each element in the array.
@@ -159,7 +153,7 @@ impl ArrayImpl for FSSTArray {
     type Encoding = FSSTEncoding;
 
     fn _len(&self) -> usize {
-        self.codes.len()
+        self.encoded.len()
     }
 
     fn _dtype(&self) -> &DType {
@@ -179,19 +173,19 @@ impl ArrayStatisticsImpl for FSSTArray {
 
 impl ArrayValidityImpl for FSSTArray {
     fn _is_valid(&self, index: usize) -> VortexResult<bool> {
-        self.codes().is_valid(index)
+        self.encoded().is_valid(index)
     }
 
     fn _all_valid(&self) -> VortexResult<bool> {
-        self.codes().all_valid()
+        self.encoded().all_valid()
     }
 
     fn _all_invalid(&self) -> VortexResult<bool> {
-        self.codes().all_invalid()
+        self.encoded().all_invalid()
     }
 
     fn _validity_mask(&self) -> VortexResult<Mask> {
-        self.codes().validity_mask()
+        self.encoded().validity_mask()
     }
 }
 

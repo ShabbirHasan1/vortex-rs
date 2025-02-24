@@ -14,7 +14,8 @@ use crate::{FSSTArray, FSSTEncoding};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FSSTMetadata {
     symbols_len: usize,
-    codes_nullability: Nullability,
+    #[serde(alias = "codes_nullability")]
+    nullability: Nullability,
     uncompressed_lengths_ptype: PType,
 }
 
@@ -22,14 +23,14 @@ impl ArrayVisitorImpl<SerdeMetadata<FSSTMetadata>> for FSSTArray {
     fn _children(&self, visitor: &mut dyn ArrayChildVisitor) {
         visitor.visit_child("symbols", self.symbols());
         visitor.visit_child("symbol_lengths", self.symbol_lengths());
-        visitor.visit_child("codes", self.codes());
+        visitor.visit_child("codes", self.encoded());
         visitor.visit_child("uncompressed_lengths", self.uncompressed_lengths());
     }
 
     fn _metadata(&self) -> SerdeMetadata<FSSTMetadata> {
         SerdeMetadata(FSSTMetadata {
             symbols_len: self.symbols().len(),
-            codes_nullability: self.codes().dtype().nullability(),
+            nullability: self.encoded().dtype().nullability(),
             uncompressed_lengths_ptype: PType::try_from(self.uncompressed_lengths().dtype())
                 .vortex_expect("Must be a valid PType"),
         })
@@ -55,7 +56,7 @@ impl SerdeVTable<&FSSTArray> for FSSTEncoding {
                 .decode(ctx, SYMBOL_LENS_DTYPE.clone(), metadata.symbols_len)?;
         let codes = parts
             .child(2)
-            .decode(ctx, DType::Binary(metadata.codes_nullability), len)?;
+            .decode(ctx, DType::Binary(metadata.nullability), len)?;
         let uncompressed_lengths = parts.child(3).decode(
             ctx,
             DType::Primitive(
@@ -87,7 +88,7 @@ mod test {
             "fsst.metadata",
             SerdeMetadata(FSSTMetadata {
                 symbols_len: usize::MAX,
-                codes_nullability: Nullability::Nullable,
+                nullability: Nullability::Nullable,
                 uncompressed_lengths_ptype: PType::U64,
             }),
         );

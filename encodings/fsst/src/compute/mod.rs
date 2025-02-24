@@ -44,7 +44,7 @@ impl SliceFn<&FSSTArray> for FSSTEncoding {
             array.dtype().clone(),
             array.symbols().clone(),
             array.symbol_lengths().clone(),
-            slice(array.codes(), start, stop)?,
+            slice(array.encoded(), start, stop)?,
             slice(array.uncompressed_lengths(), start, stop)?,
         )?
         .into_array())
@@ -58,7 +58,7 @@ impl TakeFn<&FSSTArray> for FSSTEncoding {
             array.dtype().clone(),
             array.symbols().clone(),
             array.symbol_lengths().clone(),
-            take(array.codes(), indices)?,
+            take(array.encoded(), indices)?,
             take(array.uncompressed_lengths(), indices)?,
         )?
         .into_array())
@@ -76,7 +76,7 @@ impl TakeFn<&FSSTArray> for FSSTEncoding {
 
 impl ScalarAtFn<&FSSTArray> for FSSTEncoding {
     fn scalar_at(&self, array: &FSSTArray, index: usize) -> VortexResult<Scalar> {
-        let compressed = scalar_at(array.codes(), index)?;
+        let compressed = scalar_at(array.encoded(), index)?;
         let binary_datum = compressed
             .as_binary()
             .value()
@@ -96,7 +96,7 @@ impl FilterFn<&FSSTArray> for FSSTEncoding {
             array.dtype().clone(),
             array.symbols().clone(),
             array.symbol_lengths().clone(),
-            filter(array.codes(), mask)?,
+            filter(array.encoded(), mask)?,
             filter(array.uncompressed_lengths(), mask)?,
         )?
         .into_array())

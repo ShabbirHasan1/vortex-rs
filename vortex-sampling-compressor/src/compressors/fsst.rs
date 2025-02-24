@@ -92,7 +92,7 @@ impl EncodingCompressor for FSSTCompressor {
                 )
             };
 
-        let codes = fsst_array.codes();
+        let codes = fsst_array.encoded();
         let compressed_codes = ctx
             .auxiliary("fsst_codes")
             .excluding(self)
