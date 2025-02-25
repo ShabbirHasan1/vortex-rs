@@ -55,29 +55,6 @@ impl BitBufferMut {
         }
     }
 
-    /// Create a new mutable buffer of the requested length, backed by uninitialized memory.
-    ///
-    /// This is a performance optimization for cases where we know only some of the bits in the
-    /// memory will be read, for example if you want to store a sparse bitset where all reads first
-    /// get masked via another bitset.
-    ///
-    /// # Safety
-    ///
-    /// The caller must initialize the sparse bitset, and be sure to guard against accidentally
-    /// reading uninitialized bits as if they were initialized.
-    pub unsafe fn new_uninit(len: usize) -> Self {
-        let words = len.div_ceil(8);
-        let mut buffer = BufferMut::with_capacity(words);
-        // SAFETY: the length is now equal to the requested capacity.
-        unsafe { buffer.set_len(words) };
-
-        Self {
-            buffer,
-            len,
-            capacity: len,
-        }
-    }
-
     /// Get the current populated length of the buffer.
     pub fn len(&self) -> usize {
         self.len
@@ -92,8 +69,8 @@ impl BitBufferMut {
     pub fn value(&self, index: usize) -> bool {
         assert!(index < self.len, "index {index} exceeds len {}", self.len);
 
-        let word = self.buffer[index / 64];
-        let bit = word & (1 << (index % 64));
+        let word = self.buffer[index / 8];
+        let bit = word & (1 << (index % 8));
 
         bit != 0
     }
@@ -289,25 +266,6 @@ mod tests {
             assert!(!bools.value(i));
         }
         assert!(bools.value(9));
-    }
-
-    #[test]
-    fn test_uninit() {
-        let mut bools = unsafe { BitBufferMut::new_uninit(10) };
-        assert_eq!(bools.len(), 10);
-        bools.set(0);
-        bools.unset(1);
-        bools.set(2);
-        bools.unset(3);
-        bools.set(4);
-        bools.unset(5);
-        bools.set(6);
-        bools.unset(7);
-        bools.set(8);
-        bools.unset(9);
-
-        let bools = bools.freeze();
-        assert_eq!(bools.true_count(), 5);
     }
 
     #[test]
