@@ -29,9 +29,12 @@ pub struct FoRArray {
 
 pub struct FoREncoding;
 impl Encoding for FoREncoding {
-    const ID: EncodingId = EncodingId::new_ref("fastlanes.for");
     type Array = FoRArray;
     type Metadata = ScalarValueMetadata;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.for")
+    }
 }
 
 impl FoRArray {

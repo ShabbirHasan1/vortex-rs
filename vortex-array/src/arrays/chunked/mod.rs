@@ -41,9 +41,12 @@ pub struct ChunkedArray {
 
 pub struct ChunkedEncoding;
 impl Encoding for ChunkedEncoding {
-    const ID: EncodingId = EncodingId::new_ref("vortex.chunked");
     type Array = ChunkedArray;
     type Metadata = EmptyMetadata;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.chunked")
+    }
 }
 
 impl ChunkedArray {

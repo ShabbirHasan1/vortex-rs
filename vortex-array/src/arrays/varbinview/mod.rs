@@ -227,9 +227,12 @@ try_from_array_ref!(VarBinViewArray);
 
 pub struct VarBinViewEncoding;
 impl Encoding for VarBinViewEncoding {
-    const ID: EncodingId = EncodingId::new_ref("vortex.varbinview");
     type Array = VarBinViewArray;
     type Metadata = EmptyMetadata;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.varbinview")
+    }
 }
 
 impl VarBinViewArray {

@@ -31,9 +31,12 @@ pub struct ALPRDArray {
 
 pub struct ALPRDEncoding;
 impl Encoding for ALPRDEncoding {
-    const ID: EncodingId = EncodingId::new_ref("vortex.alprd");
     type Array = ALPRDArray;
     type Metadata = SerdeMetadata<ALPRDMetadata>;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.alprd")
+    }
 }
 
 impl ALPRDArray {

@@ -38,9 +38,12 @@ pub struct ListArray {
 
 pub struct ListEncoding;
 impl Encoding for ListEncoding {
-    const ID: EncodingId = EncodingId::new_ref("vortex.list");
     type Array = ListArray;
     type Metadata = RkyvMetadata<ListMetadata>;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.list")
+    }
 }
 
 pub trait OffsetPType: NativePType + PrimInt + AsPrimitive<usize> + Into<Scalar> {}

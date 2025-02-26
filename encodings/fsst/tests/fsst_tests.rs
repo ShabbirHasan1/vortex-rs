@@ -52,7 +52,7 @@ fn test_fsst_array_ops() {
 
     // test slice
     let fsst_sliced = slice(&fsst_array, 1, 3).unwrap();
-    assert_eq!(fsst_sliced.encoding(), FSSTEncoding::ID);
+    assert_eq!(fsst_sliced.encoding(), FSSTEncoding.id());
     assert_eq!(fsst_sliced.len(), 2);
     assert_nth_scalar!(
         fsst_sliced,

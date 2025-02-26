@@ -35,9 +35,12 @@ pub struct DeltaArray {
 
 pub struct DeltaEncoding;
 impl Encoding for DeltaEncoding {
-    const ID: EncodingId = EncodingId::new_ref("fastlanes.delta");
     type Array = DeltaArray;
     type Metadata = RkyvMetadata<DeltaMetadata>;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.delta")
+    }
 }
 
 /// A FastLanes-style delta-encoded array of primitive values.

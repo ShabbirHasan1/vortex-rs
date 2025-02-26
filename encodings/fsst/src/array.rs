@@ -27,9 +27,12 @@ pub struct FSSTArray {
 
 pub struct FSSTEncoding;
 impl Encoding for FSSTEncoding {
-    const ID: EncodingId = EncodingId::new_ref("vortex.fsst");
     type Array = FSSTArray;
     type Metadata = SerdeMetadata<FSSTMetadata>;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.fsst")
+    }
 }
 
 pub(crate) static SYMBOLS_DTYPE: DType = DType::Primitive(PType::U64, Nullability::NonNullable);
@@ -76,7 +79,7 @@ impl FSSTArray {
             vortex_bail!(InvalidArgument: "uncompressed_lengths must have integer type and cannot be nullable, found {}", uncompressed_lengths.dtype());
         }
 
-        if codes.encoding() != VarBinEncoding::ID {
+        if codes.encoding() != Encoding::id(&VarBinEncoding) {
             vortex_bail!(
                 InvalidArgument: "codes must have varbin encoding, was {}",
                 codes.encoding()

@@ -26,10 +26,12 @@ pub struct BoolArray {
 
 pub struct BoolEncoding;
 impl Encoding for BoolEncoding {
-    const ID: EncodingId = EncodingId::new_ref("vortex.bool");
-
     type Array = BoolArray;
     type Metadata = RkyvMetadata<BoolMetadata>;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.bool")
+    }
 }
 
 impl BoolArray {

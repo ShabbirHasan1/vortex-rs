@@ -30,9 +30,12 @@ pub struct DictArray {
 
 pub struct DictEncoding;
 impl Encoding for DictEncoding {
-    const ID: EncodingId = EncodingId::new_ref("vortex.dict");
     type Array = DictArray;
     type Metadata = RkyvMetadata<DictMetadata>;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.dict")
+    }
 }
 
 impl DictArray {

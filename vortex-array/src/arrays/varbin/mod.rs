@@ -45,9 +45,12 @@ try_from_array_ref!(VarBinArray);
 
 pub struct VarBinEncoding;
 impl Encoding for VarBinEncoding {
-    const ID: EncodingId = EncodingId::new_ref("vortex.varbin");
     type Array = VarBinArray;
     type Metadata = RkyvMetadata<VarBinMetadata>;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.varbin")
+    }
 }
 
 impl VarBinArray {

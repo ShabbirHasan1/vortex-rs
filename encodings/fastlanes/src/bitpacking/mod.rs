@@ -41,9 +41,12 @@ try_from_array_ref!(BitPackedArray);
 
 pub struct BitPackedEncoding;
 impl Encoding for BitPackedEncoding {
-    const ID: EncodingId = EncodingId::new_ref("fastlanes.bitpacked");
     type Array = BitPackedArray;
     type Metadata = RkyvMetadata<BitPackedMetadata>;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.bitpacked")
+    }
 }
 
 /// NB: All non-null values in the patches array are considered patches

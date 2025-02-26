@@ -28,9 +28,12 @@ try_from_array_ref!(ByteBoolArray);
 
 pub struct ByteBoolEncoding;
 impl Encoding for ByteBoolEncoding {
-    const ID: EncodingId = EncodingId::new_ref("vortex.bytebool");
     type Array = ByteBoolArray;
     type Metadata = EmptyMetadata;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.bytebool")
+    }
 }
 
 impl ByteBoolArray {

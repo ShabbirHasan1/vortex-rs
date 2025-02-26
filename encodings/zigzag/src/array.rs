@@ -28,9 +28,12 @@ try_from_array_ref!(ZigZagArray);
 
 pub struct ZigZagEncoding;
 impl Encoding for ZigZagEncoding {
-    const ID: EncodingId = EncodingId::new_ref("vortex.zigzag");
     type Array = ZigZagArray;
     type Metadata = EmptyMetadata;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.zigzag")
+    }
 }
 
 impl ZigZagArray {

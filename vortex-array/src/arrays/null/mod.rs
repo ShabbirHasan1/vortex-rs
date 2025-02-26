@@ -24,9 +24,12 @@ pub struct NullArray {
 
 pub struct NullEncoding;
 impl Encoding for NullEncoding {
-    const ID: EncodingId = EncodingId::new_ref("vortex.null");
     type Array = NullArray;
     type Metadata = EmptyMetadata;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.null")
+    }
 }
 
 impl NullArray {

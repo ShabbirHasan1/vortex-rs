@@ -24,9 +24,12 @@ pub struct ConstantArray {
 
 pub struct ConstantEncoding;
 impl Encoding for ConstantEncoding {
-    const ID: EncodingId = EncodingId::new_ref("vortex.constant");
     type Array = ConstantArray;
     type Metadata = EmptyMetadata;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.constant")
+    }
 }
 
 impl ConstantArray {

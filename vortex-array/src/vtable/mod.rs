@@ -70,6 +70,6 @@ impl<
 > EncodingVTable for E
 {
     fn id(&self) -> EncodingId {
-        E::ID
+        <E as Encoding>::id(self)
     }
 }

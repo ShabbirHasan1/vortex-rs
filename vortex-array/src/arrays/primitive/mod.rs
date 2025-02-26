@@ -38,9 +38,12 @@ try_from_array_ref!(PrimitiveArray);
 
 pub struct PrimitiveEncoding;
 impl Encoding for PrimitiveEncoding {
-    const ID: EncodingId = EncodingId::new_ref("vortex.primitive");
     type Array = PrimitiveArray;
     type Metadata = EmptyMetadata;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.primitive")
+    }
 }
 
 impl PrimitiveArray {

@@ -34,9 +34,12 @@ try_from_array_ref!(SparseArray);
 
 pub struct SparseEncoding;
 impl Encoding for SparseEncoding {
-    const ID: EncodingId = EncodingId::new_ref("vortex.sparse");
     type Array = SparseArray;
     type Metadata = RkyvMetadata<SparseMetadata>;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.sparse")
+    }
 }
 
 impl SparseArray {

@@ -34,9 +34,12 @@ try_from_array_ref!(RunEndArray);
 
 pub struct RunEndEncoding;
 impl Encoding for RunEndEncoding {
-    const ID: EncodingId = EncodingId::new_ref("vortex.runend");
     type Array = RunEndArray;
     type Metadata = SerdeMetadata<RunEndMetadata>;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.runend")
+    }
 }
 
 impl RunEndArray {

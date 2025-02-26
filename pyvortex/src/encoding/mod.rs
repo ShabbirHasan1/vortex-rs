@@ -4,6 +4,7 @@ use pyo3::{Bound, PyResult, Python};
 mod builtins;
 mod compressed;
 mod fastlanes;
+mod pyencoding;
 
 use builtins::{
     PyBoolEncoding, PyChunkedEncoding, PyConstantEncoding, PyExtensionEncoding, PyListEncoding,

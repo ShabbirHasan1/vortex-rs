@@ -28,9 +28,12 @@ pub struct DateTimePartsArray {
 
 pub struct DateTimePartsEncoding;
 impl Encoding for DateTimePartsEncoding {
-    const ID: EncodingId = EncodingId::new_ref("vortex.datetimeparts");
     type Array = DateTimePartsArray;
     type Metadata = RkyvMetadata<DateTimePartsMetadata>;
+
+    fn id(&self) -> EncodingId {
+        EncodingId::new_ref("vortex.datetimeparts")
+    }
 }
 
 impl DateTimePartsArray {
