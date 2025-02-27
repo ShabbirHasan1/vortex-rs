@@ -71,7 +71,7 @@ impl LayoutWriter for FlatLayoutWriter {
         retain_only_stats(&chunk, &self.options.array_stats);
 
         let buffers = chunk.serialize(
-            &self.ctx,
+            &mut self.ctx,
             &SerializeOptions {
                 offset: 0,
                 include_padding: self.options.include_padding,

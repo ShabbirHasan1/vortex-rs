@@ -69,6 +69,11 @@ impl<T: Clone + Eq> VTableContext<T> {
         self.0.read().vortex_expect("poisoned lock")
     }
 
+    /// Returns the index of the given encoding, or pushes it into the context.
+    pub fn upsert_encoding_idx(&mut self, encoding: &T) -> u16 {
+        self.encoding_idx(encoding)
+    }
+
     /// Returns the index of the encoding in the context, or adds it if it doesn't exist.
     pub fn encoding_idx(&self, encoding: &T) -> u16 {
         let mut write = self.0.write().vortex_expect("poisoned lock");

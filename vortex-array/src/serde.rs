@@ -1,9 +1,11 @@
+use std::borrow::BorrowMut;
+use std::cell::RefCell;
 use std::fmt::{Debug, Formatter};
 use std::iter;
+use std::ops::DerefMut;
 use std::sync::Arc;
 
 use flatbuffers::{FlatBufferBuilder, Follow, WIPOffset, root};
-use itertools::Itertools;
 use vortex_buffer::{Alignment, ByteBuffer};
 use vortex_dtype::{DType, TryFromBytes};
 use vortex_error::{
@@ -38,7 +40,7 @@ impl dyn Array + '_ {
     /// The format of this blob is a sequence of data buffers, possible with prefixed padding,
     /// followed by a flatbuffer containing an [`fba::Array`] message, and ending with a
     /// little-endian u32 describing the length of the flatbuffer message.
-    pub fn serialize(&self, ctx: &ArrayContext, options: &SerializeOptions) -> Vec<ByteBuffer> {
+    pub fn serialize(&self, ctx: &mut ArrayContext, options: &SerializeOptions) -> Vec<ByteBuffer> {
         // Collect all array buffers
         let mut array_buffers = vec![];
         for a in self.depth_first_traversal() {
@@ -95,7 +97,7 @@ impl dyn Array + '_ {
 
         // Set up the flatbuffer builder
         let mut fbb = FlatBufferBuilder::new();
-        let root = ArrayNodeFlatBuffer::new(ctx, self);
+        let root = ArrayNodeFlatBuffer::new(RefCell::new(ctx), self);
         let fb_root = root.write_flatbuffer(&mut fbb);
         let fb_buffers = fbb.create_vector(&fb_buffers);
         let fb_array = fba::Array::create(
@@ -133,13 +135,13 @@ impl dyn Array + '_ {
 
 /// A utility struct for creating an [`fba::ArrayNode`] flatbuffer.
 pub struct ArrayNodeFlatBuffer<'a> {
-    ctx: &'a ArrayContext,
+    ctx: RefCell<&'a mut ArrayContext>,
     array: &'a dyn Array,
     buffer_idx: u16,
 }
 
 impl<'a> ArrayNodeFlatBuffer<'a> {
-    pub fn new(ctx: &'a ArrayContext, array: &'a dyn Array) -> Self {
+    pub fn new(ctx: RefCell<&'a mut ArrayContext>, array: &'a dyn Array) -> Self {
         Self {
             ctx,
             array,
@@ -157,7 +159,11 @@ impl WriteFlatBuffer for ArrayNodeFlatBuffer<'_> {
         &self,
         fbb: &mut FlatBufferBuilder<'fb>,
     ) -> WIPOffset<Self::Target<'fb>> {
-        let encoding = self.ctx.encoding_idx(&self.array.vtable());
+        let encoding = {
+            let mut ctx = self.ctx.borrow_mut();
+            ctx.borrow_mut().upsert_encoding_idx(&self.array.vtable())
+        };
+
         let metadata = self
             .array
             .metadata()
@@ -168,25 +174,22 @@ impl WriteFlatBuffer for ArrayNodeFlatBuffer<'_> {
             .vortex_expect("Array can have at most u16::MAX buffers");
         let child_buffer_idx = self.buffer_idx + nbuffers;
 
-        let children = self
-            .array
-            .children()
-            .iter()
-            .scan(child_buffer_idx, |buffer_idx, child| {
-                // Update the number of buffers required.
-                let msg = ArrayNodeFlatBuffer {
-                    ctx: self.ctx,
-                    array: child,
-                    buffer_idx: *buffer_idx,
-                }
-                .write_flatbuffer(fbb);
-                *buffer_idx = u16::try_from(child.nbuffers_recursive())
-                    .ok()
-                    .and_then(|nbuffers| nbuffers.checked_add(*buffer_idx))
-                    .vortex_expect("Too many buffers (u16) for Array");
-                Some(msg)
-            })
-            .collect_vec();
+        let mut children = Vec::with_capacity(self.array.nchildren());
+        let mut next_buffer_idx = child_buffer_idx;
+        for child in self.array.children() {
+            // Update the number of buffers required.
+            let msg = ArrayNodeFlatBuffer {
+                ctx: RefCell::new(self.ctx.borrow_mut().deref_mut()),
+                array: &child,
+                buffer_idx: next_buffer_idx,
+            }
+            .write_flatbuffer(fbb);
+            next_buffer_idx = u16::try_from(child.nbuffers_recursive())
+                .ok()
+                .and_then(|nbuffers| nbuffers.checked_add(next_buffer_idx))
+                .vortex_expect("Too many buffers (u16) for Array");
+            children.push(msg);
+        }
         let children = Some(fbb.create_vector(&children));
 
         let buffers = Some(fbb.create_vector_from_iter((0..nbuffers).map(|i| i + self.buffer_idx)));
