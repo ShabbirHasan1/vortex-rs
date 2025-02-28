@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
-use async_once_cell::OnceCell;
+// use async_once_cell::OnceCell;
 use vortex_array::serde::ArrayParts;
-use vortex_array::{ArrayContext, ArrayRef};
+use vortex_array::{Array, ArrayContext, ArrayRef};
 use vortex_error::{VortexExpect, VortexResult, vortex_err, vortex_panic};
 
 use crate::layouts::flat::FlatLayout;
+use crate::once_cell::VortexOnceCell;
 use crate::reader::LayoutReader;
 use crate::segments::AsyncSegmentReader;
 use crate::{Layout, LayoutReaderExt, LayoutVTable};
@@ -16,7 +17,8 @@ pub struct FlatReader {
     segment_reader: Arc<dyn AsyncSegmentReader>,
     // TODO(ngates): we need to add an invalidate_row_range function to evict these from the
     //  cache.
-    array: Arc<OnceCell<ArrayRef>>,
+    // array: Arc<async_once_cell::OnceCell<ArrayRef>>,
+    array: Arc<VortexOnceCell<dyn Array>>,
 }
 
 impl FlatReader {
@@ -33,7 +35,8 @@ impl FlatReader {
             layout,
             ctx,
             segment_reader,
-            array: Arc::new(Default::default()),
+            // array: Arc::new(OnceCell::new()),
+            array: Arc::new(VortexOnceCell::new()),
         })
     }
 
@@ -41,7 +44,7 @@ impl FlatReader {
         &self.ctx
     }
 
-    pub(crate) async fn array(&self) -> VortexResult<&ArrayRef> {
+    pub(crate) async fn array(&self) -> VortexResult<ArrayRef> {
         self.array
             .get_or_try_init(async move {
                 let segment_id = self

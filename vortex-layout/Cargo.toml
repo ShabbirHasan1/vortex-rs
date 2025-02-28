@@ -40,6 +40,7 @@ vortex-scalar = { workspace = true }
 [dev-dependencies]
 futures = { workspace = true, features = ["executor"] }
 rstest = { workspace = true }
+tokio = { workspace = true, features = ["rt", "macros"] }
 
 [features]
 tokio = ["dep:tokio", "vortex-error/tokio"]

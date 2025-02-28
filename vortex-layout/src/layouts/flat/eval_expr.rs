@@ -16,7 +16,8 @@ impl ExprEvaluator for FlatReader {
     ) -> VortexResult<ArrayRef> {
         assert!(row_mask.true_count() > 0);
 
-        let mut array = self.array().await?.clone();
+        let array = self.array().await?;
+        let mut in_progress = array.clone();
 
         // TODO(ngates): what's the best order to apply the filter mask / expression?
         let begin = usize::try_from(row_mask.begin())
@@ -24,20 +25,20 @@ impl ExprEvaluator for FlatReader {
 
         // Slice the array based on the row mask.
         if begin > 0 || (begin + row_mask.len()) < array.len() {
-            array = slice(&array, begin, begin + row_mask.len())?;
+            in_progress = slice(&array, begin, begin + row_mask.len())?;
         }
 
         // Filter the array based on the row mask.
         if !row_mask.filter_mask().all_true() {
-            array = filter(&array, row_mask.filter_mask())?;
+            in_progress = filter(&array, row_mask.filter_mask())?;
         }
 
         // Evaluate the projection expression.
         if !expr.as_any().is::<Identity>() {
-            array = expr.evaluate(&array)?;
+            in_progress = expr.evaluate(&array)?;
         }
 
-        Ok(array)
+        Ok(in_progress)
     }
 
     async fn prune_mask(&self, row_mask: RowMask, _expr: ExprRef) -> VortexResult<RowMask> {
