@@ -14,7 +14,8 @@ use vortex::TryIntoArray;
 use vortex::arrow::FromArrowType;
 use vortex::dtype::DType;
 use vortex::error::{VortexError, vortex_err};
-use vortex::file::{VORTEX_FILE_EXTENSION, VortexWriteOptions};
+use vortex::file::{DEFAULT_REGISTRY, VORTEX_FILE_EXTENSION, VortexWriteOptions};
+use vortex::layout::{LayoutRegistry, LayoutRegistryExt};
 use vortex::stream::ArrayStreamAdapter;
 use vortex_datafusion::persistent::VortexFormat;
 
