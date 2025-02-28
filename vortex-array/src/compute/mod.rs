@@ -34,6 +34,8 @@ pub use take_from::TakeFromFn;
 pub use to_arrow::*;
 pub use uncompressed_size::*;
 
+#[cfg(feature = "arbitrary")]
+mod arbitrary;
 mod between;
 mod binary_numeric;
 mod boolean;
