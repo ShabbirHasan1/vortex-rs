@@ -395,6 +395,13 @@ macro_rules! vortex_panic {
     }};
 }
 
+#[cfg(feature = "anyhow")]
+impl From<anyhow::Error> for VortexError {
+    fn from(value: anyhow::Error) -> Self {
+        Self::InvalidArgument(format!("{:?}", value).into(), Backtrace::capture())
+    }
+}
+
 #[cfg(feature = "datafusion")]
 impl From<VortexError> for datafusion_common::DataFusionError {
     fn from(value: VortexError) -> Self {

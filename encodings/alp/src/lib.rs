@@ -15,6 +15,12 @@
 
 pub use alp::*;
 pub use alp_rd::*;
+use wasm_bindgen::prelude::wasm_bindgen;
 
 mod alp;
 mod alp_rd;
+
+#[wasm_bindgen]
+pub fn decode(bytes: &[u8]) {
+    alert(&format!("Hello, {}!", bytes));
+}

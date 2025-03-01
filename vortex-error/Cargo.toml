@@ -18,11 +18,13 @@ name = "vortex_error"
 path = "src/lib.rs"
 
 [features]
+anyhow = ["dep:anyhow"]
 flatbuffers = ["dep:flatbuffers"]
 datafusion = ["datafusion-common"]
 python = ["dep:pyo3"]
 
 [dependencies]
+anyhow = { workspace = true, optional = true }
 arrow-schema = { workspace = true }
 datafusion-common = { workspace = true, optional = true }
 flatbuffers = { workspace = true, optional = true }
