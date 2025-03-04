@@ -42,16 +42,15 @@ impl FlatReader {
     }
 
     pub(crate) async fn array(&self) -> VortexResult<&ArrayRef> {
+        let segment_id = self
+            .layout()
+            .segment_id(0)
+            .ok_or_else(|| vortex_err!("FlatLayout missing segment"))?;
         self.array
             .get_or_try_init(instrument!(
                 "flat_read",
-                { name = self.layout().name() },
+                fields(name = self.layout.name(), segment_id = *segment_id),
                 async move {
-                    let segment_id = self
-                        .layout()
-                        .segment_id(0)
-                        .ok_or_else(|| vortex_err!("FlatLayout missing segment"))?;
-
                     log::debug!(
                         "Requesting segment {} for flat layout {} expr",
                         segment_id,
