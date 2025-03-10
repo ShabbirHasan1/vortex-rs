@@ -5,7 +5,7 @@ use vortex_array::arrays::{BoolArray, PrimitiveArray, VarBinViewArray};
 use vortex_array::compute::scalar_at;
 use vortex_array::{Array, ArrayRef, ToCanonical};
 use vortex_dtype::{DType, NativePType, match_each_native_ptype};
-use vortex_error::{VortexExpect, VortexResult};
+use vortex_error::VortexResult;
 
 use crate::take::take_canonical_array;
 
