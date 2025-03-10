@@ -7,6 +7,205 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## `vortex-tui` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-tui-v0.25.2...vortex-tui-v0.26.0) - 2025-03-10
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+
+## `vortex-datafusion` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-datafusion-v0.25.2...vortex-datafusion-v0.26.0) - 2025-03-10
+
+### Other
+- Datafusion 46 ([#2417](https://github.com/spiraldb/vortex/pull/2417))
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+- More deterministic re-partitioning logic ([#2603](https://github.com/spiraldb/vortex/pull/2603))
+- prefetch conjuncts flag for pruning ([#2577](https://github.com/spiraldb/vortex/pull/2577))
+- Move Arrow dtype conversion into vortex-dtype ([#2588](https://github.com/spiraldb/vortex/pull/2588))
+
+## `vortex` - [0.26.0](https://github.com/spiraldb/vortex/compare/0.25.2...0.26.0) - 2025-03-10
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+- Move Arrow dtype conversion into vortex-dtype ([#2588](https://github.com/spiraldb/vortex/pull/2588))
+
+## `vortex-ipc` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-ipc-v0.25.2...vortex-ipc-v0.26.0) - 2025-03-10
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+
+## `vortex-file` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-file-v0.25.2...vortex-file-v0.26.0) - 2025-03-10
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+- Cleanup some unused dependencies ([#2582](https://github.com/spiraldb/vortex/pull/2582))
+
+## `vortex-layout` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-layout-v0.25.2...vortex-layout-v0.26.0) - 2025-03-10
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+- prefetch conjuncts flag for pruning ([#2577](https://github.com/spiraldb/vortex/pull/2577))
+- Cleanup some unused dependencies ([#2582](https://github.com/spiraldb/vortex/pull/2582))
+
+## `vortex-io` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-io-v0.25.2...vortex-io-v0.26.0) - 2025-03-10
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+
+## `vortex-metrics` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-metrics-v0.25.2...vortex-metrics-v0.26.0) - 2025-03-10
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+
+## `vortex-expr` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-expr-v0.25.2...vortex-expr-v0.26.0) - 2025-03-10
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+- Fix pruning expressions with and / or ([#2595](https://github.com/spiraldb/vortex/pull/2595))
+- Add pruning support to between exprs ([#2596](https://github.com/spiraldb/vortex/pull/2596))
+- Cleanup some unused dependencies ([#2582](https://github.com/spiraldb/vortex/pull/2582))
+
+## `vortex-bytebool` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-bytebool-v0.25.2...vortex-bytebool-v0.26.0) - 2025-03-10
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+- Cleanup some unused dependencies ([#2582](https://github.com/spiraldb/vortex/pull/2582))
+
+## `vortex-btrblocks` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-btrblocks-v0.25.2...vortex-btrblocks-v0.26.0) - 2025-03-10
+
+### Fixed
+- Handle leading nulls when computing stats in compressor ([#2608](https://github.com/spiraldb/vortex/pull/2608))
+- SparseScheme handles null values that are not equal to top value ([#2586](https://github.com/spiraldb/vortex/pull/2586))
+
+### Other
+- SparseScheme correctly encodes mostly null arrays ([#2630](https://github.com/spiraldb/vortex/pull/2630))
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+- Move Arrow dtype conversion into vortex-dtype ([#2588](https://github.com/spiraldb/vortex/pull/2588))
+
+## `vortex-zigzag` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-zigzag-v0.25.2...vortex-zigzag-v0.26.0) - 2025-03-10
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+
+## `vortex-sparse` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-sparse-v0.25.2...vortex-sparse-v0.26.0) - 2025-03-10
+
+### Fixed
+- SparseArray#search_sorted handles non null fill value that is between patch values ([#2585](https://github.com/spiraldb/vortex/pull/2585))
+- SparseArray#search_sorted properly handles fill values and behaves differently than Patches#search_sorted ([#2581](https://github.com/spiraldb/vortex/pull/2581))
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+
+## `vortex-runend` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-runend-v0.25.2...vortex-runend-v0.26.0) - 2025-03-10
+
+### Added
+- `is_sorted` vtable ([#2591](https://github.com/spiraldb/vortex/pull/2591))
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+
+## `vortex-dict` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-dict-v0.25.2...vortex-dict-v0.26.0) - 2025-03-10
+
+### Added
+- `is_sorted` vtable ([#2591](https://github.com/spiraldb/vortex/pull/2591))
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+- Cleanup some unused dependencies ([#2582](https://github.com/spiraldb/vortex/pull/2582))
+
+## `vortex-fsst` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-fsst-v0.25.2...vortex-fsst-v0.26.0) - 2025-03-10
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+
+## `vortex-datetime-parts` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-datetime-parts-v0.25.2...vortex-datetime-parts-v0.26.0) - 2025-03-10
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+- Move Arrow dtype conversion into vortex-dtype ([#2588](https://github.com/spiraldb/vortex/pull/2588))
+- Cleanup some unused dependencies ([#2582](https://github.com/spiraldb/vortex/pull/2582))
+
+## `vortex-alp` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-alp-v0.25.2...vortex-alp-v0.26.0) - 2025-03-10
+
+### Fixed
+- ALP encoding handles infinity, negative zero and nan values ([#2555](https://github.com/spiraldb/vortex/pull/2555))
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+- ALP-RD encoder uses fxhash instead of foldhash ([#2604](https://github.com/spiraldb/vortex/pull/2604))
+
+## `vortex-fastlanes` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-fastlanes-v0.25.2...vortex-fastlanes-v0.26.0) - 2025-03-10
+
+### Fixed
+- ALP encoding handles infinity, negative zero and nan values ([#2555](https://github.com/spiraldb/vortex/pull/2555))
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+
+## `vortex-array` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-array-v0.25.2...vortex-array-v0.26.0) - 2025-03-10
+
+### Added
+- ChunkedArray uses a builder to implement to_canonical ([#2511](https://github.com/spiraldb/vortex/pull/2511))
+- `is_sorted` vtable ([#2591](https://github.com/spiraldb/vortex/pull/2591))
+
+### Fixed
+- SparseArray#search_sorted handles non null fill value that is between patch values ([#2585](https://github.com/spiraldb/vortex/pull/2585))
+- Patches#search_sorted correctly handles searching from right ([#2590](https://github.com/spiraldb/vortex/pull/2590))
+- SparseArray#search_sorted properly handles fill values and behaves differently than Patches#search_sorted ([#2581](https://github.com/spiraldb/vortex/pull/2581))
+
+### Other
+- ChunkedArray with empty chunks can be constant ([#2628](https://github.com/spiraldb/vortex/pull/2628))
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+- Wire SumFn for chunked and constant ([#2606](https://github.com/spiraldb/vortex/pull/2606))
+- Add more docs to SearchSortedFn ([#2602](https://github.com/spiraldb/vortex/pull/2602))
+- Fix pruning expressions with and / or ([#2595](https://github.com/spiraldb/vortex/pull/2595))
+- Move Arrow dtype conversion into vortex-dtype ([#2588](https://github.com/spiraldb/vortex/pull/2588))
+- Python decode function ([#2563](https://github.com/spiraldb/vortex/pull/2563))
+
+## `vortex-scalar` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-scalar-v0.25.2...vortex-scalar-v0.26.0) - 2025-03-10
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+- Move Arrow dtype conversion into vortex-dtype ([#2588](https://github.com/spiraldb/vortex/pull/2588))
+- Cleanup some unused dependencies ([#2582](https://github.com/spiraldb/vortex/pull/2582))
+
+## `vortex-mask` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-mask-v0.25.2...vortex-mask-v0.26.0) - 2025-03-10
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+
+## `vortex-dtype` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-dtype-v0.25.2...vortex-dtype-v0.26.0) - 2025-03-10
+
+### Added
+- initial FFI crate + Java bindings ([#2516](https://github.com/spiraldb/vortex/pull/2516))
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+- Move Arrow dtype conversion into vortex-dtype ([#2588](https://github.com/spiraldb/vortex/pull/2588))
+- Cleanup some unused dependencies ([#2582](https://github.com/spiraldb/vortex/pull/2582))
+
+## `vortex-proto` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-proto-v0.25.2...vortex-proto-v0.26.0) - 2025-03-10
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+
+## `vortex-flatbuffers` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-flatbuffers-v0.25.2...vortex-flatbuffers-v0.26.0) - 2025-03-10
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+
+## `vortex-buffer` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-buffer-v0.25.2...vortex-buffer-v0.26.0) - 2025-03-10
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+
+## `vortex-error` - [0.26.0](https://github.com/spiraldb/vortex/compare/vortex-error-v0.25.2...vortex-error-v0.26.0) - 2025-03-10
+
+### Added
+- initial FFI crate + Java bindings ([#2516](https://github.com/spiraldb/vortex/pull/2516))
+
+### Other
+- Lint all toml files using Taplo ([#2455](https://github.com/spiraldb/vortex/pull/2455))
+- Python decode function ([#2563](https://github.com/spiraldb/vortex/pull/2563))
+
 ## `vortex-metrics` - [0.25.2](https://github.com/spiraldb/vortex/releases/tag/vortex-metrics-v0.25.2) - 2025-03-03
 
 ### Fixed
